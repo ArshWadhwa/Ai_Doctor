@@ -2,11 +2,14 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
+console.log('API Base URL:', API_BASE_URL); // Debug log
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 60000, // 60 second timeout for large files
 });
 
 export interface ConsultationResult {
@@ -21,25 +24,42 @@ export const consultationService = {
     image?: File | null, 
     audio?: Blob | null
   ): Promise<ConsultationResult> {
-    const formData = new FormData();
-    
-    if (image) {
-      formData.append('image', image);
-    }
-    
-    if (audio) {
-      // Convert Blob to File for proper form data
-      const audioFile = new File([audio], 'recording.wav', { type: 'audio/wav' });
-      formData.append('audio', audioFile);
-    }
+    try {
+      console.log('Starting consultation...', { hasImage: !!image, hasAudio: !!audio });
+      
+      const formData = new FormData();
+      
+      if (image) {
+        console.log('Adding image to form data:', image.name, image.type, image.size);
+        formData.append('image', image);
+      }
+      
+      if (audio) {
+        // Convert Blob to File for proper form data
+        const audioFile = new File([audio], 'recording.wav', { type: 'audio/wav' });
+        console.log('Adding audio to form data:', audioFile.name, audioFile.type, audioFile.size);
+        formData.append('audio', audioFile);
+      }
 
-    const response = await api.post('/medical-consultation', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+      console.log('Making API request to:', `${API_BASE_URL}/medical-consultation`);
+      
+      const response = await api.post('/medical-consultation', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-    return response.data;
+      console.log('API response received:', response.status);
+      return response.data;
+    } catch (error) {
+      console.error('Consultation API Error:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+        console.error('Response headers:', error.response?.headers);
+      }
+      throw error;
+    }
   },
 
   // Transcribe audio only
