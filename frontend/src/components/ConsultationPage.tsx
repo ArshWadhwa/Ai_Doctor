@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { consultationService } from '../services/api';
 
+// Get API base URL from environment
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
 interface ConsultationResult {
   transcription: string;
   analysis: string;
@@ -405,7 +408,7 @@ const ConsultationPage: React.FC = () => {
                   </button>
                   <audio
                     ref={audioRef}
-                    src={`http://localhost:8000${result.audio_url}`}
+                    src={`${API_BASE_URL}${result.audio_url}`}
                     onEnded={() => setIsPlayingAudio(false)}
                     onPause={() => setIsPlayingAudio(false)}
                   />
