@@ -1,0 +1,534 @@
+/* Consultation Page Styles - Enhanced with modern design */
+.consultation-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* Header styles */
+.consultation-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.consultation-header-container {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.back-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.consultation-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.consultation-logo-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #4ade80;
+}
+
+.consultation-logo h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Main content */
+.consultation-container {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.consultation-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  padding: 3rem;
+}
+
+.consultation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.consultation-title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.consultation-subtitle {
+  text-align: center;
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 32rem;
+  margin: 0 auto 2rem;
+}
+
+/* Error message */
+.error-card {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.error-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #fca5a5;
+  flex-shrink: 0;
+}
+
+.error-text {
+  color: #fca5a5;
+}
+
+/* Input sections */
+.input-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.input-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.section-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #4ade80;
+}
+
+.input-controls {
+  text-align: center;
+}
+
+/* Audio recording */
+.record-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #4ade80;
+  color: #1f2937;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 0 auto;
+}
+
+.record-button:hover:not(:disabled) {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.record-button.recording {
+  background: #ef4444;
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+.record-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.record-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.audio-recorded {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.audio-success {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.rerecord-button {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #f87171;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rerecord-button:hover {
+  background: #f87171;
+  color: white;
+}
+
+/* Image upload */
+.upload-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 1rem;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.upload-zone:hover {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.upload-icon {
+  width: 4rem;
+  height: 4rem;
+  color: #4ade80;
+  margin: 0 auto 1rem;
+}
+
+.upload-text {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+}
+
+.file-input {
+  display: none;
+}
+
+.image-preview-container {
+  position: relative;
+  text-align: center;
+}
+
+.image-preview {
+  max-width: 100%;
+  max-height: 18rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.remove-image {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.remove-image:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.remove-image svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Submit button */
+.submit-button {
+  width: 100%;
+  background: #4ade80;
+  color: #1f2937;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.submit-button:hover:not(:disabled) {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submit-button svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Results section */
+.results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.results-title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+.result-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.result-card-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #4ade80;
+}
+
+.transcription-content {
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #4ade80;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  font-style: italic;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.analysis-card {
+  border: 2px solid #4ade80;
+}
+
+.analysis-content {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Audio player */
+.audio-player {
+  text-align: center;
+}
+
+.play-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #4ade80;
+  color: #1f2937;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 0 auto;
+}
+
+.play-button:hover {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.play-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Action buttons */
+.result-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  text-align: center;
+  display: inline-block;
+}
+
+.action-button-primary {
+  background: #4ade80;
+  color: #1f2937;
+}
+
+.action-button-primary:hover {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.action-button-secondary {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.action-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Disclaimer */
+.disclaimer {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  color: #fde68a;
+}
+
+.disclaimer p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .consultation-header-container {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .consultation-container {
+    padding: 1rem;
+  }
+  
+  .consultation-card {
+    padding: 2rem;
+  }
+  
+  .consultation-title {
+    font-size: 2rem;
+  }
+  
+  .results-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .consultation-title {
+    font-size: 1.75rem;
+  }
+  
+  .input-section {
+    padding: 1.5rem;
+  }
+  
+  .upload-zone {
+    padding: 2rem;
+  }
+  
+  .upload-icon {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  .result-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .action-button {
+    width: 100%;
+    max-width: 18rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .consultation-card {
+    padding: 1.5rem;
+  }
+  
+  .consultation-title {
+    font-size: 1.5rem;
+  }
+  
+  .results-title {
+    font-size: 1.5rem;
+  }
+  
+  .input-section-title {
+    font-size: 1.25rem;
+  }
+  
+  .result-card-title {
+    font-size: 1.25rem;
+  }
+}

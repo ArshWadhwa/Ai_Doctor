@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-multipart
+gradio>=4.0.0
+groq
+gtts
+elevenlabs
+python-dotenv
+pydub
+SpeechRecognition
+requests
+Pillow
+numpy
