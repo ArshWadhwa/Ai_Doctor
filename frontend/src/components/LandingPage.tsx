@@ -16,7 +16,7 @@ const LandingPage: React.FC = () => {
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center shadow-lg">
                 <Stethoscope className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">AI Medical Doctor</span>
+              <span className="text-xl font-bold text-white">MediCare AI</span>
             </div>
 
             {/* Desktop Navigation */}
