@@ -207,6 +207,16 @@ def validate_insights_response(insights):
 async def root():
     return {"message": "AI Medical Doctor API is running"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment monitoring"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "supabase_configured": supabase is not None,
+        "openrouter_configured": OPENROUTER_API_KEY is not None
+    }
+
 @app.post("/transcribe-audio")
 async def transcribe_audio(audio: UploadFile = File(...)):
     """Transcribe audio to text using Groq API"""
