@@ -2,7 +2,19 @@ import logging
 import speech_recognition as sr
 from pydub import AudioSegment
 from io import BytesIO
+from dotenv import load_dotenv
+from groq import Groq
+import os
 
+# Global client instance for connection reuse
+_groq_client = None
+
+def get_groq_client(api_key: str):
+    """Get or create a singleton Groq client for connection reuse"""
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s-%(levelname)s -%(message)s')
 
@@ -64,7 +76,7 @@ def transcribe_with_groq(GROQ_API_KEY, audio_filepath, stt_model):
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY is required")
     
-    client = Groq(api_key=GROQ_API_KEY)
+    client = get_groq_client(GROQ_API_KEY)  # Use singleton client
     
     try:
         with open(audio_filepath, "rb") as audio_file:
