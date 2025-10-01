@@ -41,12 +41,34 @@ app = FastAPI(title="AI Medical Doctor API")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
+print(f"Environment check:")
+print(f"SUPABASE_URL: {'✓ Set' if SUPABASE_URL else '✗ Missing'}")
+print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
+print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
+
 # Initialize supabase client only if environment variables are properly set
 if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✓ Supabase client initialized successfully")
+        
+        # Try to create health_insights table if it doesn't exist
+        try:
+            # Test if table exists by trying to select from it
+            supabase.table("health_insights").select("id").limit(1).execute()
+            print("✓ health_insights table exists")
+        except Exception as table_error:
+            print(f"⚠ health_insights table check failed: {table_error}")
+            print("You may need to create the health_insights table in Supabase dashboard")
+            
+    except Exception as e:
+        print(f"✗ Supabase client initialization failed: {e}")
+        supabase = None
 else:
     supabase = None
-    print("Warning: Supabase not configured. Health insights will not work.")
+    print("✗ Supabase not configured. Check environment variables.")
+    print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
+    print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
 
 # -------------------------
 # OpenRouter Setup  
