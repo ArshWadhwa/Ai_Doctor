@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Dict
 import httpx
 import json
+import requests
 from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -381,10 +382,37 @@ async def medical_consultation_get(limit: int = Query(10, description="Number of
         raise HTTPException(status_code=500, detail=f"Error fetching consultations: {str(e)}")
 
 # -------------------------
-# Health Insights API Endpoint
+# Health Insights API Endpoints
 # -------------------------
+@app.get("/api/health-insights/{user_id}")
+async def get_stored_health_insights(user_id: str):
+    """Get stored health insights for a user"""
+    try:
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        
+        insights_response = supabase.table("health_insights").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        
+        insights = []
+        for insight in insights_response.data:
+            insights.append({
+                "id": insight["id"],
+                "issue": insight["issue"],
+                "advice": insight["advice"],
+                "urgency": insight["urgency"],
+                "consultation_count": insight["consultation_count"],
+                "created_at": insight["created_at"]
+            })
+        
+        return {"insights": insights}
+        
+    except Exception as e:
+        print(f"Error fetching stored insights: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching insights: {str(e)}")
+
 @app.post("/api/health-insights")
-async def generate_health_insights(request: dict):
+async def generate_and_store_health_insights(request: dict):
+    """Generate new AI health insights and store them in database"""
     try:
         if not supabase:
             raise HTTPException(status_code=503, detail="Database not configured")
@@ -393,43 +421,212 @@ async def generate_health_insights(request: dict):
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID required")
         
-        # Fetch consultations from Supabase
-        consultations_response = supabase.table("consultations")\
-            .select("*")\
-            .eq("user_id", user_id)\
-            .execute()
-        consultations = consultations_response.data
+        # Get user consultations
+        consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).execute()
         
-        if not consultations:
-            return {"insights": [], "message": "No consultations found"}
-        
-        # Create prompt and get AI insights
-        prompt = create_health_insights_prompt(consultations)
-        
-        if not OPENROUTER_API_KEY:
-            # Fallback response if no AI API key
+        if not consultations_response.data:
             return {
-                "insights": [{
-                    "issue": "general health",
-                    "advice": "Based on your consultation history, continue monitoring your health and consult healthcare professionals as needed.",
-                    "urgency": "low"
-                }],
-                "total_consultations": len(consultations),
-                "analysis_date": datetime.now().isoformat()
+                "insights": [],
+                "message": "No consultations found. Complete a consultation first to get insights."
             }
         
-        ai_response = await get_ai_health_insights(prompt)
-        insights = parse_ai_insights_response(ai_response)
-        validated_insights = validate_insights_response(insights)
+        consultation_count = len(consultations_response.data)
         
-        return {
-            "insights": validated_insights,
-            "total_consultations": len(consultations),
-            "analysis_date": datetime.now().isoformat()
-        }
+        # Clear existing insights for this user
+        supabase.table("health_insights").delete().eq("user_id", user_id).execute()
+        
+        # Prepare consultation data for AI analysis
+        consultation_data = []
+        for consultation in consultations_response.data:
+            consultation_data.append({
+                "symptoms": consultation.get("symptoms", ""),
+                "diagnosis": consultation.get("diagnosis", ""),
+                "recommendations": consultation.get("recommendations", ""),
+                "analysis": consultation.get("analysis", ""),
+                "transcription": consultation.get("transcription", ""),
+                "date": consultation.get("created_at", "")
+            })
+        
+        # Generate AI insights using OpenRouter
+        if OPENROUTER_API_KEY:
+            prompt = f"""You are a medical AI assistant. Analyze the consultation history and provide health insights.
+
+IMPORTANT: Respond ONLY with a valid JSON array. No explanations, no markdown, no extra text.
+
+Consultation Data: {consultation_data}
+
+Generate 2-4 personalized health insights based on patterns in the consultation history.
+
+Required JSON format:
+[
+  {{
+    "issue": "Brief health concern or pattern",
+    "advice": "Specific actionable advice",
+    "urgency": "low"
+  }},
+  {{
+    "issue": "Another health concern",
+    "advice": "Another piece of advice",
+    "urgency": "medium"
+  }}
+]
+
+Valid urgency levels: "low", "medium", "high"
+Respond with JSON array only:"""
+            
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "deepseek/deepseek-chat-v3.1:free",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "max_tokens": 1000,
+                "temperature": 0.7
+            }
+            
+            print(f"Making OpenRouter API call with model: deepseek/deepseek-chat-v3.1:free")
+            print(f"API Key present: {bool(OPENROUTER_API_KEY)}")
+            print(f"API Key starts with: {OPENROUTER_API_KEY[:10] if OPENROUTER_API_KEY else 'None'}...")
+            
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", 
+                                   headers=headers, json=payload, timeout=30)
+            
+            print(f"OpenRouter response status: {response.status_code}")
+            print(f"OpenRouter response headers: {dict(response.headers)}")
+            
+            if response.status_code == 200:
+                ai_response = response.json()
+                print(f"AI Response structure: {list(ai_response.keys())}")
+                
+                if 'choices' in ai_response and ai_response['choices']:
+                    ai_content = ai_response['choices'][0]['message']['content'].strip()
+                    print(f"Raw AI Response: {ai_content}")
+                    
+                    # Extract JSON insights
+                    insights = extract_json_insights(ai_content)
+                    print(f"Extracted insights: {insights}")
+                    
+                    if not insights:
+                        print("No insights extracted, using fallback")
+                        insights = get_fallback_insights()
+                else:
+                    print("No choices in AI response, using fallback")
+                    insights = get_fallback_insights()
+            else:
+                error_text = response.text
+                print(f"OpenRouter API error: {response.status_code} - {error_text}")
+                insights = get_fallback_insights()
+        else:
+            insights = get_fallback_insights()
+        
+        # Store insights in database
+        stored_insights = []
+        for insight in insights:
+            try:
+                result = supabase.table("health_insights").insert({
+                    "user_id": user_id,
+                    "issue": insight.get("issue", "General Health"),
+                    "advice": insight.get("advice", "Continue regular health monitoring"),
+                    "urgency": insight.get("urgency", "low"),
+                    "consultation_count": consultation_count
+                }).execute()
+                
+                if result.data:
+                    stored_insight = result.data[0]
+                    stored_insights.append({
+                        "id": stored_insight["id"],
+                        "issue": stored_insight["issue"],
+                        "advice": stored_insight["advice"],
+                        "urgency": stored_insight["urgency"],
+                        "consultation_count": stored_insight["consultation_count"],
+                        "created_at": stored_insight["created_at"]
+                    })
+            except Exception as store_error:
+                print(f"Error storing insight: {store_error}")
+                continue
+        
+        return {"insights": stored_insights}
         
     except Exception as e:
+        print(f"Health insights error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating insights: {str(e)}")
+
+@app.delete("/api/health-insights/{insight_id}")
+async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
+    """Delete a specific health insight"""
+    try:
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        
+        # Verify the insight belongs to the user
+        insight_response = supabase.table("health_insights").select("user_id").eq("id", insight_id).execute()
+        
+        if not insight_response.data:
+            raise HTTPException(status_code=404, detail="Insight not found")
+        
+        if insight_response.data[0]["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this insight")
+        
+        # Delete the insight
+        supabase.table("health_insights").delete().eq("id", insight_id).execute()
+        
+        return {"message": "Insight deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting insight: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting insight: {str(e)}")
+
+def extract_json_insights(ai_content):
+    """Extract JSON insights from AI response"""
+    try:
+        # Try to find JSON array in the response
+        start_idx = ai_content.find('[')
+        end_idx = ai_content.rfind(']') + 1
+        
+        if start_idx != -1 and end_idx > start_idx:
+            json_str = ai_content[start_idx:end_idx]
+            insights = json.loads(json_str)
+            
+            # Validate each insight
+            valid_insights = []
+            for insight in insights:
+                if isinstance(insight, dict) and 'issue' in insight and 'advice' in insight:
+                    valid_insights.append({
+                        "issue": insight.get("issue", "").strip(),
+                        "advice": insight.get("advice", "").strip(),
+                        "urgency": insight.get("urgency", "low").lower()
+                    })
+            
+            return valid_insights[:4]  # Limit to 4 insights
+        
+        return []
+    except Exception as e:
+        print(f"Error extracting JSON insights: {e}")
+        return []
+
+def get_fallback_insights():
+    """Provide fallback insights when AI fails"""
+    return [
+        {
+            "issue": "Regular Health Monitoring",
+            "advice": "Continue tracking your health through regular consultations. This helps identify patterns and potential health concerns early.",
+            "urgency": "low"
+        },
+        {
+            "issue": "Lifestyle Optimization", 
+            "advice": "Focus on maintaining a balanced diet, regular exercise, and adequate sleep. These are fundamental pillars of good health.",
+            "urgency": "medium"
+        }
+    ]
 
 
 @app.get("/download-audio/{filename}")
