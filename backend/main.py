@@ -444,7 +444,12 @@ async def get_stored_health_insights(user_id: str):
     """Get stored health insights for a user"""
     try:
         if not supabase:
-            raise HTTPException(status_code=503, detail="Database not configured")
+            # Return empty insights if database is not configured
+            return {
+                "insights": [],
+                "message": "Database not configured. Please set up Supabase environment variables.",
+                "database_configured": False
+            }
         
         insights_response = supabase.table("health_insights").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         
@@ -459,22 +464,44 @@ async def get_stored_health_insights(user_id: str):
                 "created_at": insight["created_at"]
             })
         
-        return {"insights": insights}
+        return {"insights": insights, "database_configured": True}
         
     except Exception as e:
         print(f"Error fetching stored insights: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching insights: {str(e)}")
+        # Return empty insights instead of raising an exception
+        return {
+            "insights": [],
+            "error": f"Error fetching insights: {str(e)}",
+            "database_configured": bool(supabase)
+        }
 
 @app.post("/api/health-insights")
 async def generate_and_store_health_insights(request: dict):
     """Generate new AI health insights and store them in database"""
     try:
-        if not supabase:
-            raise HTTPException(status_code=503, detail="Database not configured")
-        
         user_id = request.get("user_id")
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID required")
+        
+        if not supabase:
+            # Generate insights without storing if database not configured
+            print("Database not configured - generating fallback insights")
+            insights = get_fallback_insights()
+            return {
+                "insights": [
+                    {
+                        "id": f"fallback-{i}",
+                        "issue": insight["issue"],
+                        "advice": insight["advice"],
+                        "urgency": insight["urgency"],
+                        "consultation_count": 0,
+                        "created_at": datetime.now().isoformat()
+                    }
+                    for i, insight in enumerate(insights)
+                ],
+                "message": "Database not configured. Displaying sample insights.",
+                "database_configured": False
+            }
         
         # Get user consultations
         consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).execute()
@@ -618,7 +645,10 @@ async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
     """Delete a specific health insight"""
     try:
         if not supabase:
-            raise HTTPException(status_code=503, detail="Database not configured")
+            return {
+                "message": "Database not configured. Cannot delete insights.",
+                "database_configured": False
+            }
         
         # Verify the insight belongs to the user
         insight_response = supabase.table("health_insights").select("user_id").eq("id", insight_id).execute()
@@ -632,13 +662,16 @@ async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
         # Delete the insight
         supabase.table("health_insights").delete().eq("id", insight_id).execute()
         
-        return {"message": "Insight deleted successfully"}
+        return {"message": "Insight deleted successfully", "database_configured": True}
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error deleting insight: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting insight: {str(e)}")
+        return {
+            "message": f"Error deleting insight: {str(e)}",
+            "database_configured": bool(supabase)
+        }
 
 def extract_json_insights(ai_content):
     """Extract JSON insights from AI response"""
