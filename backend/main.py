@@ -22,6 +22,18 @@ from voice_of_patient import transcribe_with_groq
 from voice_of_doctor import text_to_speech_elevenLabs
 
 app = FastAPI(title="AI Medical Doctor API")
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Import existing modules
+from brain_of_doc import encode_image, analyze_image_with_query, analyze_text_only
+from voice_of_patient import transcribe_with_groq
+from voice_of_doctor import text_to_speech_elevenLabs
+
+app = FastAPI(title="AI Medical Doctor API")
 
 # -------------------------
 # Supabase Setup
@@ -48,15 +60,28 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,https://ai
 # Strip whitespace and filter empty strings
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
 
-print(f"Allowed CORS origins: {ALLOWED_ORIGINS}")  # Debug log
+# Add additional fallback origins for production
+additional_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "https://aimedicaldoc.netlify.app",
+    "https://ai-doctor-tq5i.onrender.com"
+]
 
-# Configure CORS
+# Merge and deduplicate origins
+all_origins = list(set(ALLOWED_ORIGINS + additional_origins))
+
+print(f"Environment ALLOWED_ORIGINS: {os.getenv('ALLOWED_ORIGINS')}")
+print(f"Final allowed CORS origins: {all_origins}")
+
+# Configure CORS with broader permissions for production debugging
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=all_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Set up logging
@@ -206,13 +231,21 @@ def validate_insights_response(insights):
 
 @app.get("/")
 async def root():
-    return {"message": "AI Medical Doctor API is running"}
+    return {
+        "message": "AI Medical Doctor API is running",
+        "cors_origins": all_origins,
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint for deployment monitoring"""
     return {
         "status": "healthy",
+        "message": "AI Medical Doctor API is operational",
+        "database_configured": bool(supabase),
+        "openrouter_configured": bool(OPENROUTER_API_KEY),
+        "cors_origins": all_origins,
         "timestamp": datetime.now().isoformat(),
         "supabase_configured": supabase is not None,
         "openrouter_configured": OPENROUTER_API_KEY is not None
