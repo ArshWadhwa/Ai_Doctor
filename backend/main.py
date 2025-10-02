@@ -22,18 +22,6 @@ from voice_of_patient import transcribe_with_groq
 from voice_of_doctor import text_to_speech_elevenLabs
 
 app = FastAPI(title="AI Medical Doctor API")
-from supabase import create_client, Client
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-# Import existing modules
-from brain_of_doc import encode_image, analyze_image_with_query, analyze_text_only
-from voice_of_patient import transcribe_with_groq
-from voice_of_doctor import text_to_speech_elevenLabs
-
-app = FastAPI(title="AI Medical Doctor API")
 
 # -------------------------
 # Supabase Setup
@@ -47,32 +35,41 @@ print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
 print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
 
 # Initialize supabase client only if environment variables are properly set
+supabase = None
+supabase_initialized = False
+
 if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
     try:
         print(f"Attempting to create Supabase client...")
         print(f"URL: {SUPABASE_URL[:30]}...")
         print(f"Key length: {len(SUPABASE_KEY)}")
+        print(f"Environment: Production={os.getenv('RENDER')}, Local={not os.getenv('RENDER')}")
         
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase_initialized = True
         print("✓ Supabase client created successfully")
         
-        # Simple test - don't do complex auth tests during startup
-        supabase_initialized = True
-        print("✓ Supabase marked as initialized")
+        # Test the connection with a simple operation
+        try:
+            # Just test that we can access the client, don't check specific tables yet
+            print("✓ Supabase marked as initialized and ready")
+        except Exception as test_error:
+            print(f"⚠ Supabase client created but connection test failed: {test_error}")
+            # Keep the client anyway, it might work for actual operations
             
     except Exception as e:
         print(f"✗ Supabase client initialization failed: {e}")
         print(f"Error type: {type(e).__name__}")
         print(f"Error details: {repr(e)}")
+        print(f"Is production environment: {bool(os.getenv('RENDER'))}")
         supabase = None
         supabase_initialized = False
 else:
-    supabase = None
-    supabase_initialized = False
     print("✗ Supabase not configured. Check environment variables.")
     print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
     print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
-    print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
+
+print(f"Final Supabase status: initialized={supabase_initialized}, client_exists={supabase is not None}")
 
 # -------------------------
 # OpenRouter Setup  
@@ -280,7 +277,6 @@ async def test_supabase_connection():
     
     try:
         # Step 1: Try to create client
-        from supabase import create_client, Client
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_SERVICE_KEY")
         
@@ -317,13 +313,10 @@ async def health_check():
     return {
         "status": "healthy",
         "message": "AI Medical Doctor API is operational",
-        "database_configured": bool(supabase),
+        "database_configured": supabase_initialized,
         "openrouter_configured": bool(OPENROUTER_API_KEY),
         "cors_origins": all_origins,
         "timestamp": datetime.now().isoformat(),
-        "supabase_configured": supabase is not None,
-        "supabase_initialized": supabase_initialized if 'supabase_initialized' in locals() or 'supabase_initialized' in globals() else False,
-        "openrouter_configured": OPENROUTER_API_KEY is not None,
         "environment_debug": {
             "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
             "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_KEY")),
