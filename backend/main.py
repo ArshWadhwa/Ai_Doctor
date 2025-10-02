@@ -270,7 +270,15 @@ async def health_check():
         "cors_origins": all_origins,
         "timestamp": datetime.now().isoformat(),
         "supabase_configured": supabase is not None,
-        "openrouter_configured": OPENROUTER_API_KEY is not None
+        "openrouter_configured": OPENROUTER_API_KEY is not None,
+        "environment_debug": {
+            "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
+            "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_KEY")),
+            "openrouter_key_set": bool(os.getenv("OPENROUTER_API_KEY")),
+            "supabase_url_preview": os.getenv("SUPABASE_URL", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_URL") else "NOT_SET",
+            "supabase_key_preview": os.getenv("SUPABASE_SERVICE_KEY", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET",
+            "all_env_vars": list(os.environ.keys())[:10]  # Show first 10 env vars for debugging
+        }
     }
 
 @app.post("/transcribe-audio")
