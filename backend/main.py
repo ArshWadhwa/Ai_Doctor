@@ -49,64 +49,26 @@ print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '
 # Initialize supabase client only if environment variables are properly set
 if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
     try:
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✓ Supabase client initialized successfully")
+        print(f"Attempting to create Supabase client...")
+        print(f"URL: {SUPABASE_URL[:30]}...")
+        print(f"Key length: {len(SUPABASE_KEY)}")
         
-        # Test basic connection (don't fail if table doesn't exist)
-        try:
-            # Try a simple auth test instead of table check
-            supabase.auth.get_session()
-            print("✓ Supabase connection verified")
-        except Exception as connection_error:
-            print(f"⚠ Supabase connection test warning: {connection_error}")
-            # Don't fail - the client might still work for other operations
-            
-        # Separately check if health_insights table exists (don't fail initialization)
-        try:
-            supabase.table("health_insights").select("id").limit(1).execute()
-            print("✓ health_insights table exists and accessible")
-        except Exception as table_error:
-            print(f"⚠ health_insights table check failed: {table_error}")
-            print("Attempting to create health_insights table...")
-            
-            # Try to create the table automatically
-            try:
-                create_table_sql = """
-                CREATE TABLE IF NOT EXISTS health_insights (
-                  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-                  issue TEXT NOT NULL,
-                  advice TEXT NOT NULL,
-                  urgency TEXT DEFAULT 'low' CHECK (urgency IN ('low', 'medium', 'high')),
-                  consultation_count INTEGER DEFAULT 0,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-                
-                ALTER TABLE health_insights ENABLE ROW LEVEL SECURITY;
-                
-                CREATE POLICY IF NOT EXISTS "Users can view own health insights" ON health_insights
-                  FOR SELECT USING (auth.uid() = user_id);
-                CREATE POLICY IF NOT EXISTS "Users can insert own health insights" ON health_insights
-                  FOR INSERT WITH CHECK (auth.uid() = user_id);
-                CREATE POLICY IF NOT EXISTS "Users can delete own health insights" ON health_insights
-                  FOR DELETE USING (auth.uid() = user_id);
-                """
-                
-                # Execute the SQL using Supabase RPC or direct SQL execution
-                supabase.rpc("exec", {"sql": create_table_sql}).execute()
-                print("✓ health_insights table created successfully")
-                
-            except Exception as create_error:
-                print(f"⚠ Could not auto-create table: {create_error}")
-                print("Please create the health_insights table manually in Supabase dashboard")
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✓ Supabase client created successfully")
+        
+        # Simple test - don't do complex auth tests during startup
+        supabase_initialized = True
+        print("✓ Supabase marked as initialized")
             
     except Exception as e:
         print(f"✗ Supabase client initialization failed: {e}")
-        print(f"Error details: {type(e).__name__}: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error details: {repr(e)}")
         supabase = None
+        supabase_initialized = False
 else:
     supabase = None
+    supabase_initialized = False
     print("✗ Supabase not configured. Check environment variables.")
     print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
     print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
@@ -301,6 +263,54 @@ async def root():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/test-supabase")
+async def test_supabase_connection():
+    """Test Supabase connection independently with detailed error reporting"""
+    result = {
+        "environment_vars": {
+            "SUPABASE_URL": os.getenv("SUPABASE_URL", "NOT_SET"),
+            "SUPABASE_SERVICE_KEY": "SET" if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET",
+            "url_length": len(os.getenv("SUPABASE_URL", "")),
+            "key_length": len(os.getenv("SUPABASE_SERVICE_KEY", ""))
+        },
+        "client_creation": "not_attempted",
+        "connection_test": "not_attempted",
+        "table_test": "not_attempted"
+    }
+    
+    try:
+        # Step 1: Try to create client
+        from supabase import create_client, Client
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_SERVICE_KEY")
+        
+        result["client_creation"] = "attempting..."
+        test_client = create_client(url, key)
+        result["client_creation"] = "success"
+        
+        # Step 2: Try basic connection
+        result["connection_test"] = "attempting..."
+        # Simple test - try to get auth info
+        auth_result = test_client.auth.get_session()
+        result["connection_test"] = f"success - session: {type(auth_result)}"
+        
+        # Step 3: Try table access
+        result["table_test"] = "attempting..."
+        tables_result = test_client.table("health_insights").select("id").limit(1).execute()
+        result["table_test"] = f"success - found {len(tables_result.data)} records"
+        
+        result["overall_status"] = "all_tests_passed"
+        
+    except Exception as e:
+        result["error"] = {
+            "type": type(e).__name__,
+            "message": str(e),
+            "details": repr(e)
+        }
+        result["overall_status"] = "failed"
+    
+    return result
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for deployment monitoring"""
@@ -312,6 +322,7 @@ async def health_check():
         "cors_origins": all_origins,
         "timestamp": datetime.now().isoformat(),
         "supabase_configured": supabase is not None,
+        "supabase_initialized": supabase_initialized if 'supabase_initialized' in locals() or 'supabase_initialized' in globals() else False,
         "openrouter_configured": OPENROUTER_API_KEY is not None,
         "environment_debug": {
             "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
