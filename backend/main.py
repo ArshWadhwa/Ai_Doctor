@@ -52,22 +52,64 @@ if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         print("✓ Supabase client initialized successfully")
         
-        # Try to create health_insights table if it doesn't exist
+        # Test basic connection (don't fail if table doesn't exist)
         try:
-            # Test if table exists by trying to select from it
+            # Try a simple auth test instead of table check
+            supabase.auth.get_session()
+            print("✓ Supabase connection verified")
+        except Exception as connection_error:
+            print(f"⚠ Supabase connection test warning: {connection_error}")
+            # Don't fail - the client might still work for other operations
+            
+        # Separately check if health_insights table exists (don't fail initialization)
+        try:
             supabase.table("health_insights").select("id").limit(1).execute()
-            print("✓ health_insights table exists")
+            print("✓ health_insights table exists and accessible")
         except Exception as table_error:
             print(f"⚠ health_insights table check failed: {table_error}")
-            print("You may need to create the health_insights table in Supabase dashboard")
+            print("Attempting to create health_insights table...")
+            
+            # Try to create the table automatically
+            try:
+                create_table_sql = """
+                CREATE TABLE IF NOT EXISTS health_insights (
+                  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+                  issue TEXT NOT NULL,
+                  advice TEXT NOT NULL,
+                  urgency TEXT DEFAULT 'low' CHECK (urgency IN ('low', 'medium', 'high')),
+                  consultation_count INTEGER DEFAULT 0,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                
+                ALTER TABLE health_insights ENABLE ROW LEVEL SECURITY;
+                
+                CREATE POLICY IF NOT EXISTS "Users can view own health insights" ON health_insights
+                  FOR SELECT USING (auth.uid() = user_id);
+                CREATE POLICY IF NOT EXISTS "Users can insert own health insights" ON health_insights
+                  FOR INSERT WITH CHECK (auth.uid() = user_id);
+                CREATE POLICY IF NOT EXISTS "Users can delete own health insights" ON health_insights
+                  FOR DELETE USING (auth.uid() = user_id);
+                """
+                
+                # Execute the SQL using Supabase RPC or direct SQL execution
+                supabase.rpc("exec", {"sql": create_table_sql}).execute()
+                print("✓ health_insights table created successfully")
+                
+            except Exception as create_error:
+                print(f"⚠ Could not auto-create table: {create_error}")
+                print("Please create the health_insights table manually in Supabase dashboard")
             
     except Exception as e:
         print(f"✗ Supabase client initialization failed: {e}")
+        print(f"Error details: {type(e).__name__}: {str(e)}")
         supabase = None
 else:
     supabase = None
     print("✗ Supabase not configured. Check environment variables.")
     print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
+    print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
     print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
 
 # -------------------------
