@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
+import sys
 import tempfile
 import logging
 from pathlib import Path
@@ -29,18 +30,34 @@ app = FastAPI(title="AI Medical Doctor API")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
+print(f"=== ENVIRONMENT DEBUG ===")
+print(f"All environment variables count: {len(os.environ)}")
+print(f"SUPABASE_URL raw: '{SUPABASE_URL}'")
+print(f"SUPABASE_URL present: {SUPABASE_URL is not None}")
+print(f"SUPABASE_URL empty: {SUPABASE_URL == ''}")
+print(f"SUPABASE_URL length: {len(SUPABASE_URL) if SUPABASE_URL else 0}")
+print(f"SUPABASE_SERVICE_KEY present: {SUPABASE_KEY is not None}")
+print(f"SUPABASE_SERVICE_KEY empty: {SUPABASE_KEY == ''}")
+print(f"SUPABASE_SERVICE_KEY length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
 print(f"Environment check:")
 print(f"SUPABASE_URL: {'✓ Set' if SUPABASE_URL else '✗ Missing'}")
 print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
 print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
+print(f"Is Render environment: {bool(os.getenv('RENDER'))}")
+print(f"=========================")
 
 # Initialize supabase client only if environment variables are properly set
 supabase = None
 supabase_initialized = False
 
+print(f"Checking Supabase initialization conditions:")
+print(f"SUPABASE_URL exists: {bool(SUPABASE_URL)}")
+print(f"SUPABASE_KEY exists: {bool(SUPABASE_KEY)}")
+print(f"SUPABASE_URL not placeholder: {SUPABASE_URL != 'your_supabase_url'}")
+
 if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
     try:
-        print(f"Attempting to create Supabase client...")
+        print(f"✓ All conditions met - Attempting to create Supabase client...")
         print(f"URL: {SUPABASE_URL[:30]}...")
         print(f"Key length: {len(SUPABASE_KEY)}")
         print(f"Environment: Production={os.getenv('RENDER')}, Local={not os.getenv('RENDER')}")
@@ -68,6 +85,9 @@ else:
     print("✗ Supabase not configured. Check environment variables.")
     print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
     print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
+    print(f"   Condition 1 (URL exists): {bool(SUPABASE_URL)}")
+    print(f"   Condition 2 (KEY exists): {bool(SUPABASE_KEY)}")
+    print(f"   Condition 3 (URL not placeholder): {SUPABASE_URL != 'your_supabase_url'}")
 
 print(f"Final Supabase status: initialized={supabase_initialized}, client_exists={supabase is not None}")
 
@@ -126,130 +146,8 @@ If you identify a likely condition, explain it briefly and provide the most rele
 """
 
 # -------------------------
-# Helper Functions for Health Insights
+# Prompts and System Configuration
 # -------------------------
-def create_health_insights_prompt(consultations: List[Dict]) -> str:
-    consultation_text = ""
-    for i, c in enumerate(consultations, 1):
-        consultation_text += f"""
-        Consultation {i} ({c['created_at']}):
-        Symptoms: {c.get('transcription', '')}
-        Analysis: {c.get('analysis', '')}
-        ---
-        """
-    
-    prompt = f"""
-You are a medical AI assistant. Analyze the consultation history and provide health insights.
-
-CONSULTATION HISTORY:
-{consultation_text}
-
-IMPORTANT: Return ONLY a valid JSON response with this exact structure (no extra text):
-
-{{
-    "recommendations": [
-        {{
-            "issue": "specific condition name",
-            "advice": "detailed advice in 1-2 sentences",
-            "urgency": "low/medium/high"
-        }}
-    ]
-}}
-
-Rules:
-- Maximum 5 recommendations
-- Each advice should be 1-2 complete sentences
-- Use only "low", "medium", or "high" for urgency
-- Focus on preventive care, lifestyle, and when to see a doctor
-- Return ONLY the JSON, no explanations before or after
-- Do not include ```json or any markdown formatting
-"""
-    return prompt
-
-async def get_ai_health_insights(prompt: str) -> str:
-    """Call OpenRouter API for AI summarization"""
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [
-            {"role": "system", "content": "You are a helpful medical AI assistant. Return only valid JSON."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.3,
-        "max_tokens": 2000
-    }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
-
-def parse_ai_insights_response(ai_response: str):
-    """Parse AI JSON response safely"""
-    try:
-        # Clean the response - remove any extra text before/after JSON
-        response_clean = ai_response.strip()
-        
-        # Find JSON start and end
-        start = response_clean.find('{')
-        end = response_clean.rfind('}') + 1
-        
-        if start != -1 and end > start:
-            json_str = response_clean[start:end]
-            data = json.loads(json_str)
-            recommendations = data.get("recommendations", [])
-            
-            # Validate and clean each recommendation
-            clean_recommendations = []
-            for rec in recommendations:
-                if isinstance(rec, dict) and 'issue' in rec and 'advice' in rec:
-                    urgency = rec.get('urgency', 'medium').lower()
-                    if urgency not in ['low', 'medium', 'high']:
-                        urgency = 'medium'
-                    
-                    clean_recommendations.append({
-                        "issue": str(rec['issue']).strip(),
-                        "advice": str(rec['advice']).strip(),
-                        "urgency": urgency
-                    })
-            
-            return clean_recommendations[:5]  # Limit to 5 recommendations
-        else:
-            raise json.JSONDecodeError("No valid JSON found", "", 0)
-            
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"JSON parsing error: {e}")
-        print(f"AI Response: {ai_response}")
-        
-        # Enhanced fallback
-        return [{
-            "issue": "General Health Analysis",
-            "advice": "Based on your consultation history, continue monitoring your symptoms and consult with healthcare professionals for personalized care.",
-            "urgency": "medium"
-        }]
-
-def validate_insights_response(insights):
-    """Validate and clean insights response"""
-    validated_insights = []
-    
-    for insight in insights:
-        if isinstance(insight, dict) and 'issue' in insight and 'advice' in insight:
-            # Ensure urgency is valid
-            urgency = insight.get('urgency', 'medium').lower()
-            if urgency not in ['low', 'medium', 'high']:
-                urgency = 'medium'
-            
-            validated_insights.append({
-                "issue": str(insight['issue'])[:100],  # Limit length
-                "advice": str(insight['advice'])[:500],  # Limit length
-                "urgency": urgency
-            })
-    
-    return validated_insights[:5]  # Limit to 5 insights
 
 
 @app.get("/")
@@ -258,6 +156,46 @@ async def root():
         "message": "AI Medical Doctor API is running",
         "cors_origins": all_origins,
         "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/debug-environment")
+async def debug_environment():
+    """Debug endpoint to check environment variables and Supabase status"""
+    return {
+        "environment_variables": {
+            "SUPABASE_URL": {
+                "exists": bool(os.getenv("SUPABASE_URL")),
+                "is_empty": os.getenv("SUPABASE_URL") == "",
+                "length": len(os.getenv("SUPABASE_URL", "")),
+                "preview": os.getenv("SUPABASE_URL", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_URL") else "NOT_SET",
+                "equals_placeholder": os.getenv("SUPABASE_URL") == "your_supabase_url"
+            },
+            "SUPABASE_SERVICE_KEY": {
+                "exists": bool(os.getenv("SUPABASE_SERVICE_KEY")),
+                "is_empty": os.getenv("SUPABASE_SERVICE_KEY") == "",
+                "length": len(os.getenv("SUPABASE_SERVICE_KEY", "")),
+                "preview": os.getenv("SUPABASE_SERVICE_KEY", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET"
+            },
+            "OPENROUTER_API_KEY": {
+                "exists": bool(os.getenv("OPENROUTER_API_KEY")),
+                "length": len(os.getenv("OPENROUTER_API_KEY", ""))
+            },
+            "RENDER": os.getenv("RENDER", "NOT_SET"),
+            "total_env_vars": len(os.environ)
+        },
+        "supabase_status": {
+            "client_exists": supabase is not None,
+            "initialized": supabase_initialized,
+            "initialization_conditions": {
+                "url_exists": bool(SUPABASE_URL),
+                "key_exists": bool(SUPABASE_KEY),
+                "url_not_placeholder": SUPABASE_URL != "your_supabase_url" if SUPABASE_URL else False
+            }
+        },
+        "python_info": {
+            "version": sys.version,
+            "platform": sys.platform
+        }
     }
 
 @app.get("/test-supabase")
@@ -493,282 +431,256 @@ async def medical_consultation_get(limit: int = Query(10, description="Number of
 # -------------------------
 # Health Insights API Endpoints
 # -------------------------
+def extract_remedies_from_text(analysis_text: str) -> List[Dict]:
+    """Extract remedy-like recommendations from consultation analysis text"""
+    if not analysis_text:
+        return []
+    
+    remedies = []
+    
+    # Common patterns to look for remedies/recommendations
+    remedy_keywords = [
+        "rest", "hydration", "drink", "water", "sleep", "avoid", "apply", 
+        "take", "use", "medication", "treatment", "therapy", "exercise",
+        "diet", "nutrition", "warm", "cold", "compress", "elevate",
+        "gentle", "massage", "steam", "gargle", "rinse", "wash"
+    ]
+    
+    # Split text into sentences
+    sentences = analysis_text.replace('.', '.\n').replace('!', '!\n').replace('?', '?\n').split('\n')
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    for sentence in sentences:
+        sentence_lower = sentence.lower()
+        
+        # Check if sentence contains remedy keywords
+        if any(keyword in sentence_lower for keyword in remedy_keywords):
+            if len(sentence) > 20 and len(sentence) < 200:  # Reasonable length
+                urgency = "low"
+                if any(urgent in sentence_lower for urgent in ["immediately", "urgent", "serious", "severe"]):
+                    urgency = "high"
+                elif any(moderate in sentence_lower for moderate in ["important", "should", "recommend"]):
+                    urgency = "medium"
+                
+                remedies.append({
+                    "id": f"remedy-{len(remedies)}",
+                    "issue": "Health Recommendation",
+                    "advice": sentence.strip(),
+                    "urgency": urgency,
+                    "consultation_count": 1,
+                    "created_at": datetime.now().isoformat()
+                })
+    
+    # If no specific remedies found, extract general advice
+    if not remedies:
+        # Look for ICD-10 codes and recommendations around them
+        lines = analysis_text.split('.')
+        for line in lines:
+            if len(line.strip()) > 30 and len(line.strip()) < 150:
+                remedies.append({
+                    "id": f"general-{len(remedies)}",
+                    "issue": "General Health Advice",
+                    "advice": line.strip(),
+                    "urgency": "medium",
+                    "consultation_count": 1,
+                    "created_at": datetime.now().isoformat()
+                })
+                if len(remedies) >= 3:  # Limit to 3 insights
+                    break
+    
+    return remedies[:3]  # Limit to top 3 remedies
+
 @app.get("/api/health-insights/{user_id}")
-async def get_stored_health_insights(user_id: str):
-    """Get stored health insights for a user"""
+async def get_health_insights_from_consultations(user_id: str):
+    """Get health insights extracted from recent consultation analysis"""
     try:
-        if not supabase:
-            # Return empty insights if database is not configured
-            return {
-                "insights": [],
-                "message": "Database not configured. Please set up Supabase environment variables.",
-                "database_configured": False
+        # Try to get from database first
+        if supabase:
+            try:
+                consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+                
+                if consultations_response.data:
+                    all_remedies = []
+                    for consultation in consultations_response.data:
+                        analysis = consultation.get("analysis", "")
+                        if analysis:
+                            remedies = extract_remedies_from_text(analysis)
+                            all_remedies.extend(remedies)
+                    
+                    # Remove duplicates and limit to 5
+                    unique_remedies = []
+                    seen_advice = set()
+                    for remedy in all_remedies:
+                        if remedy["advice"] not in seen_advice:
+                            unique_remedies.append(remedy)
+                            seen_advice.add(remedy["advice"])
+                        if len(unique_remedies) >= 5:
+                            break
+                    
+                    if unique_remedies:
+                        return {
+                            "insights": unique_remedies,
+                            "database_configured": True,
+                            "source": "database_consultations"
+                        }
+            except Exception as db_error:
+                print(f"Database consultation fetch failed: {db_error}")
+        
+        # Fallback: Return general health insights
+        fallback_insights = [
+            {
+                "id": "general-1",
+                "issue": "Hydration",
+                "advice": "Drink plenty of water throughout the day to maintain proper hydration and support overall health.",
+                "urgency": "low",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "general-2",
+                "issue": "Rest and Recovery",
+                "advice": "Ensure adequate sleep and rest to allow your body to heal and maintain optimal immune function.",
+                "urgency": "medium",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "general-3",
+                "issue": "Professional Care",
+                "advice": "Consult with healthcare professionals for personalized medical advice and proper diagnosis.",
+                "urgency": "medium",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
             }
+        ]
         
-        insights_response = supabase.table("health_insights").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
-        
-        insights = []
-        for insight in insights_response.data:
-            insights.append({
-                "id": insight["id"],
-                "issue": insight["issue"],
-                "advice": insight["advice"],
-                "urgency": insight["urgency"],
-                "consultation_count": insight["consultation_count"],
-                "created_at": insight["created_at"]
-            })
-        
-        return {"insights": insights, "database_configured": True}
+        return {
+            "insights": fallback_insights,
+            "database_configured": bool(supabase),
+            "source": "fallback_general"
+        }
         
     except Exception as e:
-        print(f"Error fetching stored insights: {str(e)}")
-        # Return empty insights instead of raising an exception
+        print(f"Error getting health insights: {str(e)}")
         return {
             "insights": [],
-            "error": f"Error fetching insights: {str(e)}",
-            "database_configured": bool(supabase)
+            "error": f"Error getting insights: {str(e)}",
+            "database_configured": bool(supabase),
+            "source": "error"
         }
 
 @app.post("/api/health-insights")
-async def generate_and_store_health_insights(request: dict):
-    """Generate new AI health insights and store them in database"""
+async def generate_health_insights_from_consultations(request: dict):
+    """Generate health insights from recent consultation data"""
     try:
         user_id = request.get("user_id")
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID required")
         
-        if not supabase:
-            # Generate insights without storing if database not configured
-            print("Database not configured - generating fallback insights")
-            insights = get_fallback_insights()
-            return {
-                "insights": [
-                    {
-                        "id": f"fallback-{i}",
-                        "issue": insight["issue"],
-                        "advice": insight["advice"],
-                        "urgency": insight["urgency"],
-                        "consultation_count": 0,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    for i, insight in enumerate(insights)
-                ],
-                "message": "Database not configured. Displaying sample insights.",
-                "database_configured": False
-            }
-        
-        # Get user consultations
-        consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).execute()
-        
-        if not consultations_response.data:
-            return {
-                "insights": [],
-                "message": "No consultations found. Complete a consultation first to get insights."
-            }
-        
-        consultation_count = len(consultations_response.data)
-        
-        # Clear existing insights for this user
-        supabase.table("health_insights").delete().eq("user_id", user_id).execute()
-        
-        # Prepare consultation data for AI analysis
-        consultation_data = []
-        for consultation in consultations_response.data:
-            consultation_data.append({
-                "symptoms": consultation.get("symptoms", ""),
-                "diagnosis": consultation.get("diagnosis", ""),
-                "recommendations": consultation.get("recommendations", ""),
-                "analysis": consultation.get("analysis", ""),
-                "transcription": consultation.get("transcription", ""),
-                "date": consultation.get("created_at", "")
-            })
-        
-        # Generate AI insights using OpenRouter
-        if OPENROUTER_API_KEY:
-            prompt = f"""You are a medical AI assistant. Analyze the consultation history and provide health insights.
-
-IMPORTANT: Respond ONLY with a valid JSON array. No explanations, no markdown, no extra text.
-
-Consultation Data: {consultation_data}
-
-Generate 2-4 personalized health insights based on patterns in the consultation history.
-
-Required JSON format:
-[
-  {{
-    "issue": "Brief health concern or pattern",
-    "advice": "Specific actionable advice",
-    "urgency": "low"
-  }},
-  {{
-    "issue": "Another health concern",
-    "advice": "Another piece of advice",
-    "urgency": "medium"
-  }}
-]
-
-Valid urgency levels: "low", "medium", "high"
-Respond with JSON array only:"""
-            
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "deepseek/deepseek-chat-v3.1:free",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "max_tokens": 1000,
-                "temperature": 0.7
-            }
-            
-            print(f"Making OpenRouter API call with model: deepseek/deepseek-chat-v3.1:free")
-            print(f"API Key present: {bool(OPENROUTER_API_KEY)}")
-            print(f"API Key starts with: {OPENROUTER_API_KEY[:10] if OPENROUTER_API_KEY else 'None'}...")
-            
-            response = requests.post("https://openrouter.ai/api/v1/chat/completions", 
-                                   headers=headers, json=payload, timeout=30)
-            
-            print(f"OpenRouter response status: {response.status_code}")
-            print(f"OpenRouter response headers: {dict(response.headers)}")
-            
-            if response.status_code == 200:
-                ai_response = response.json()
-                print(f"AI Response structure: {list(ai_response.keys())}")
-                
-                if 'choices' in ai_response and ai_response['choices']:
-                    ai_content = ai_response['choices'][0]['message']['content'].strip()
-                    print(f"Raw AI Response: {ai_content}")
-                    
-                    # Extract JSON insights
-                    insights = extract_json_insights(ai_content)
-                    print(f"Extracted insights: {insights}")
-                    
-                    if not insights:
-                        print("No insights extracted, using fallback")
-                        insights = get_fallback_insights()
-                else:
-                    print("No choices in AI response, using fallback")
-                    insights = get_fallback_insights()
-            else:
-                error_text = response.text
-                print(f"OpenRouter API error: {response.status_code} - {error_text}")
-                insights = get_fallback_insights()
-        else:
-            insights = get_fallback_insights()
-        
-        # Store insights in database
-        stored_insights = []
-        for insight in insights:
+        # Try to get recent consultations from database
+        if supabase:
             try:
-                result = supabase.table("health_insights").insert({
-                    "user_id": user_id,
-                    "issue": insight.get("issue", "General Health"),
-                    "advice": insight.get("advice", "Continue regular health monitoring"),
-                    "urgency": insight.get("urgency", "low"),
-                    "consultation_count": consultation_count
-                }).execute()
+                consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
                 
-                if result.data:
-                    stored_insight = result.data[0]
-                    stored_insights.append({
-                        "id": stored_insight["id"],
-                        "issue": stored_insight["issue"],
-                        "advice": stored_insight["advice"],
-                        "urgency": stored_insight["urgency"],
-                        "consultation_count": stored_insight["consultation_count"],
-                        "created_at": stored_insight["created_at"]
-                    })
-            except Exception as store_error:
-                print(f"Error storing insight: {store_error}")
-                continue
+                if consultations_response.data:
+                    all_remedies = []
+                    for consultation in consultations_response.data:
+                        analysis = consultation.get("analysis", "")
+                        transcription = consultation.get("transcription", "")
+                        
+                        # Extract remedies from analysis text
+                        if analysis:
+                            remedies = extract_remedies_from_text(analysis)
+                            all_remedies.extend(remedies)
+                        
+                        # Also extract from transcription for symptoms context
+                        if transcription and len(all_remedies) < 3:
+                            symptom_advice = extract_remedies_from_text(transcription)
+                            all_remedies.extend(symptom_advice)
+                    
+                    # Remove duplicates and prioritize
+                    unique_remedies = []
+                    seen_advice = set()
+                    for remedy in all_remedies:
+                        advice_key = remedy["advice"].lower()[:50]  # Compare first 50 chars
+                        if advice_key not in seen_advice:
+                            unique_remedies.append(remedy)
+                            seen_advice.add(advice_key)
+                        if len(unique_remedies) >= 5:
+                            break
+                    
+                    if unique_remedies:
+                        return {
+                            "insights": unique_remedies,
+                            "consultation_count": len(consultations_response.data),
+                            "source": "extracted_from_consultations"
+                        }
+                else:
+                    return {
+                        "insights": [],
+                        "message": "No consultations found. Complete a consultation first to get personalized insights.",
+                        "consultation_count": 0
+                    }
+            
+            except Exception as db_error:
+                print(f"Database error in health insights generation: {db_error}")
         
-        return {"insights": stored_insights}
+        # Fallback: Return helpful general health insights
+        general_insights = [
+            {
+                "id": "wellness-1",
+                "issue": "Daily Wellness",
+                "advice": "Maintain a balanced diet with plenty of fruits and vegetables to support your immune system.",
+                "urgency": "low",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "wellness-2", 
+                "issue": "Physical Activity",
+                "advice": "Engage in regular light exercise such as walking to improve circulation and overall health.",
+                "urgency": "low",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "wellness-3",
+                "issue": "Health Monitoring",
+                "advice": "Keep track of any recurring symptoms and consult healthcare professionals when needed.",
+                "urgency": "medium",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            }
+        ]
+        
+        return {
+            "insights": general_insights,
+            "consultation_count": 0,
+            "source": "general_wellness_tips",
+            "message": "General health recommendations. Complete consultations for personalized insights."
+        }
         
     except Exception as e:
-        print(f"Health insights error: {str(e)}")
+        print(f"Health insights generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating insights: {str(e)}")
 
 @app.delete("/api/health-insights/{insight_id}")
 async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
-    """Delete a specific health insight"""
+    """Delete a specific health insight - simplified version"""
     try:
-        if not supabase:
-            return {
-                "message": "Database not configured. Cannot delete insights.",
-                "database_configured": False
-            }
-        
-        # Verify the insight belongs to the user
-        insight_response = supabase.table("health_insights").select("user_id").eq("id", insight_id).execute()
-        
-        if not insight_response.data:
-            raise HTTPException(status_code=404, detail="Insight not found")
-        
-        if insight_response.data[0]["user_id"] != user_id:
-            raise HTTPException(status_code=403, detail="Not authorized to delete this insight")
-        
-        # Delete the insight
-        supabase.table("health_insights").delete().eq("id", insight_id).execute()
-        
-        return {"message": "Insight deleted successfully", "database_configured": True}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error deleting insight: {str(e)}")
+        # Since we're now generating insights on-demand from consultations,
+        # we'll return a success message without actual deletion
         return {
-            "message": f"Error deleting insight: {str(e)}",
+            "message": "Insight removed from current session. Generate new insights to refresh.",
             "database_configured": bool(supabase)
         }
-
-def extract_json_insights(ai_content):
-    """Extract JSON insights from AI response"""
-    try:
-        # Try to find JSON array in the response
-        start_idx = ai_content.find('[')
-        end_idx = ai_content.rfind(']') + 1
         
-        if start_idx != -1 and end_idx > start_idx:
-            json_str = ai_content[start_idx:end_idx]
-            insights = json.loads(json_str)
-            
-            # Validate each insight
-            valid_insights = []
-            for insight in insights:
-                if isinstance(insight, dict) and 'issue' in insight and 'advice' in insight:
-                    valid_insights.append({
-                        "issue": insight.get("issue", "").strip(),
-                        "advice": insight.get("advice", "").strip(),
-                        "urgency": insight.get("urgency", "low").lower()
-                    })
-            
-            return valid_insights[:4]  # Limit to 4 insights
-        
-        return []
     except Exception as e:
-        print(f"Error extracting JSON insights: {e}")
-        return []
-
-def get_fallback_insights():
-    """Provide fallback insights when AI fails"""
-    return [
-        {
-            "issue": "Regular Health Monitoring",
-            "advice": "Continue tracking your health through regular consultations. This helps identify patterns and potential health concerns early.",
-            "urgency": "low"
-        },
-        {
-            "issue": "Lifestyle Optimization", 
-            "advice": "Focus on maintaining a balanced diet, regular exercise, and adequate sleep. These are fundamental pillars of good health.",
-            "urgency": "medium"
+        print(f"Error handling insight deletion: {str(e)}")
+        return {
+            "message": f"Error processing request: {str(e)}",
+            "database_configured": bool(supabase)
         }
-    ]
 
 
 @app.get("/download-audio/{filename}")
