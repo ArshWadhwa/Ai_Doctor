@@ -530,25 +530,41 @@ async def get_health_insights_from_consultations(user_id: str):
         fallback_insights = [
             {
                 "id": "general-1",
-                "issue": "Hydration",
-                "advice": "Drink plenty of water throughout the day to maintain proper hydration and support overall health.",
+                "issue": "Daily Hydration",
+                "advice": "Drink 8-10 glasses of water daily to maintain proper hydration, support kidney function, and help your body eliminate toxins naturally.",
                 "urgency": "low",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             },
             {
                 "id": "general-2",
-                "issue": "Rest and Recovery",
-                "advice": "Ensure adequate sleep and rest to allow your body to heal and maintain optimal immune function.",
+                "issue": "Quality Sleep",
+                "advice": "Aim for 7-9 hours of quality sleep each night to allow your body to repair, boost immune function, and maintain mental clarity.",
                 "urgency": "medium",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             },
             {
                 "id": "general-3",
-                "issue": "Professional Care",
-                "advice": "Consult with healthcare professionals for personalized medical advice and proper diagnosis.",
+                "issue": "Regular Exercise",
+                "advice": "Engage in at least 30 minutes of moderate exercise daily, such as brisk walking, to improve cardiovascular health and boost energy levels.",
                 "urgency": "medium",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "general-4",
+                "issue": "Stress Management",
+                "advice": "Practice stress-reduction techniques like deep breathing, meditation, or yoga to support mental health and overall well-being.",
+                "urgency": "medium",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "general-5",
+                "issue": "Preventive Healthcare",
+                "advice": "Schedule regular check-ups with healthcare professionals for early detection and prevention of health issues.",
+                "urgency": "high",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             }
@@ -557,7 +573,8 @@ async def get_health_insights_from_consultations(user_id: str):
         return {
             "insights": fallback_insights,
             "database_configured": bool(supabase),
-            "source": "fallback_general"
+            "source": "general_health_guidelines",
+            "message": "General health recommendations for optimal wellness. These insights are always available to support your health journey."
         }
         
     except Exception as e:
@@ -629,24 +646,32 @@ async def generate_health_insights_from_consultations(request: dict):
         general_insights = [
             {
                 "id": "wellness-1",
-                "issue": "Daily Wellness",
-                "advice": "Maintain a balanced diet with plenty of fruits and vegetables to support your immune system.",
-                "urgency": "low",
+                "issue": "Nutrition Balance",
+                "advice": "Maintain a balanced diet rich in fruits, vegetables, whole grains, and lean proteins to support optimal body function and immune health.",
+                "urgency": "medium",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             },
             {
                 "id": "wellness-2", 
-                "issue": "Physical Activity",
-                "advice": "Engage in regular light exercise such as walking to improve circulation and overall health.",
-                "urgency": "low",
+                "issue": "Physical Wellness",
+                "advice": "Incorporate regular physical activity into your routine, even light activities like walking can significantly improve circulation and mood.",
+                "urgency": "medium",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             },
             {
                 "id": "wellness-3",
                 "issue": "Health Monitoring",
-                "advice": "Keep track of any recurring symptoms and consult healthcare professionals when needed.",
+                "advice": "Keep track of your body's signals and any recurring symptoms. Early awareness helps in timely medical intervention when needed.",
+                "urgency": "high",
+                "consultation_count": 0,
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "id": "wellness-4",
+                "issue": "Mental Wellness",
+                "advice": "Prioritize mental health through adequate rest, social connections, and stress management techniques like deep breathing or mindfulness.",
                 "urgency": "medium",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
@@ -656,8 +681,8 @@ async def generate_health_insights_from_consultations(request: dict):
         return {
             "insights": general_insights,
             "consultation_count": 0,
-            "source": "general_wellness_tips",
-            "message": "General health recommendations. Complete consultations for personalized insights."
+            "source": "comprehensive_wellness_guide",
+            "message": "Comprehensive wellness recommendations for maintaining optimal health. Complete consultations to unlock personalized insights based on your specific health patterns."
         }
         
     except Exception as e:
