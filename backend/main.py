@@ -62,6 +62,15 @@ if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
         print(f"Key length: {len(SUPABASE_KEY)}")
         print(f"Environment: Production={os.getenv('RENDER')}, Local={not os.getenv('RENDER')}")
         
+        # Remove proxy-related environment variables that might interfere
+        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']
+        for var in proxy_vars:
+            if var in os.environ:
+                print(f"Removing {var} environment variable")
+                del os.environ[var]
+        
+        # Create client with minimal options
+        from supabase import create_client
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         supabase_initialized = True
         print("✓ Supabase client created successfully")
@@ -74,6 +83,23 @@ if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
             print(f"⚠ Supabase client created but connection test failed: {test_error}")
             # Keep the client anyway, it might work for actual operations
             
+    except TypeError as type_error:
+        if "proxy" in str(type_error):
+            print(f"✗ Supabase proxy error detected. Trying alternative initialization...")
+            try:
+                # Try importing the Client class directly and creating without proxy
+                from supabase import Client
+                supabase = Client(SUPABASE_URL, SUPABASE_KEY)
+                supabase_initialized = True
+                print("✓ Supabase client created successfully with alternative method")
+            except Exception as alt_error:
+                print(f"✗ Alternative Supabase initialization also failed: {alt_error}")
+                supabase = None
+                supabase_initialized = False
+        else:
+            print(f"✗ Supabase client initialization failed with TypeError: {type_error}")
+            supabase = None
+            supabase_initialized = False
     except Exception as e:
         print(f"✗ Supabase client initialization failed: {e}")
         print(f"Error type: {type(e).__name__}")
