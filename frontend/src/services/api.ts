@@ -1,8 +1,31 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+// Smart API configuration that works both locally and in production
+const getApiBaseUrl = () => {
+  // Check if we're in development (localhost)
+  const isDevelopment = 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('localhost');
+  
+  const localApiUrl = 'http://localhost:8000';
+  const productionApiUrl = process.env.REACT_APP_API_BASE_URL || 'https://ai-doctor-tq5i.onrender.com';
+  
+  if (isDevelopment) {
+    console.log('🔧 Development mode detected - using localhost API');
+    return localApiUrl;
+  } else {
+    console.log('🚀 Production mode detected - using deployed API');
+    return productionApiUrl;
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 console.log('API Base URL:', API_BASE_URL); // Debug log
+
+// Export for use in other components
+export { API_BASE_URL };
 
 const api = axios.create({
   baseURL: API_BASE_URL,
