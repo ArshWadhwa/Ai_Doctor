@@ -347,7 +347,8 @@ async def convert_text_to_speech(text_input: dict):
 @app.post("/medical-consultation")
 async def medical_consultation(
     image: UploadFile = File(None),
-    audio: UploadFile = File(None)
+    audio: UploadFile = File(None),
+    user_id: str = None
 ):
     """Complete medical consultation with image and audio"""
     try:
@@ -385,13 +386,33 @@ async def medical_consultation(
         
         # Handle voice-only consultation (no image but has transcription)
         elif transcription:
-            # Use voice-only prompt for text analysis
             full_prompt = voice_only_prompt.replace("[transcribed_symptoms]", transcription)
             analysis = analyze_text_only(full_prompt)
         
-        # Ensure we have some analysis to provide audio response
         if not analysis and not transcription:
             raise HTTPException(status_code=400, detail="Please provide either an image or audio recording for consultation")
+        
+        # Save consultation to database if Supabase is available
+        consultation_id = None
+        if supabase and user_id and analysis:
+            try:
+                consultation_data = {
+                    "user_id": user_id,
+                    "transcription": transcription,
+                    "analysis": analysis,
+                    "created_at": datetime.now().isoformat(),
+                    "has_image": image is not None,
+                    "has_audio": audio is not None
+                }
+                
+                result = supabase.table("consultations").insert(consultation_data).execute()
+                consultation_id = result.data[0].get("id") if result.data else None
+                logger.info(f"✓ Consultation saved to database. ID: {consultation_id}")
+            except Exception as db_error:
+                logger.error(f"✗ Failed to save consultation to database: {db_error}")
+                # Continue anyway - don't fail the consultation
+        else:
+            logger.warning(f"⚠ Consultation not saved - Supabase: {bool(supabase)}, UserID: {bool(user_id)}, Analysis: {bool(analysis)}")
         
         # Generate audio response
         audio_path = None
@@ -402,7 +423,9 @@ async def medical_consultation(
         response = {
             "transcription": transcription,
             "analysis": analysis,
-            "audio_url": f"/download-audio/{audio_path}" if audio_path else None
+            "audio_url": f"/download-audio/{audio_path}" if audio_path else None,
+            "consultation_id": consultation_id,
+            "saved_to_database": bool(consultation_id)
         }
         
         return response
@@ -494,17 +517,27 @@ def extract_remedies_from_text(analysis_text: str) -> List[Dict]:
 async def get_health_insights_from_consultations(user_id: str):
     """Get health insights extracted from recent consultation analysis"""
     try:
+        logger.info(f"📊 Fetching health insights for user: {user_id}")
+        logger.info(f"   Supabase initialized: {supabase_initialized}")
+        logger.info(f"   Supabase client exists: {supabase is not None}")
+        
         # Try to get from database first
-        if supabase:
+        if supabase and supabase_initialized:
             try:
+                logger.info(f"   Querying consultations table...")
                 consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
                 
-                if consultations_response.data:
+                logger.info(f"   Database response received: {len(consultations_response.data) if consultations_response.data else 0} consultations")
+                
+                if consultations_response.data and len(consultations_response.data) > 0:
                     all_remedies = []
-                    for consultation in consultations_response.data:
+                    for idx, consultation in enumerate(consultations_response.data):
                         analysis = consultation.get("analysis", "")
+                        logger.info(f"   Processing consultation {idx + 1}: Analysis length = {len(analysis)}")
+                        
                         if analysis:
                             remedies = extract_remedies_from_text(analysis)
+                            logger.info(f"   Extracted {len(remedies)} remedies from consultation {idx + 1}")
                             all_remedies.extend(remedies)
                     
                     # Remove duplicates and limit to 5
@@ -517,16 +550,28 @@ async def get_health_insights_from_consultations(user_id: str):
                         if len(unique_remedies) >= 5:
                             break
                     
+                    logger.info(f"✓ Returning {len(unique_remedies)} unique insights from database")
+                    
                     if unique_remedies:
                         return {
                             "insights": unique_remedies,
                             "database_configured": True,
-                            "source": "database_consultations"
+                            "source": "database_consultations",
+                            "consultation_count": len(consultations_response.data)
                         }
+                    else:
+                        logger.warning(f"⚠ No remedies extracted from {len(consultations_response.data)} consultations")
+                else:
+                    logger.info(f"⚠ No consultations found in database for user: {user_id}")
             except Exception as db_error:
-                print(f"Database consultation fetch failed: {db_error}")
+                logger.error(f"✗ Database consultation fetch failed: {db_error}")
+                logger.error(f"   Error type: {type(db_error).__name__}")
+                logger.error(f"   Error details: {repr(db_error)}")
+        else:
+            logger.warning(f"⚠ Supabase not available - initialized: {supabase_initialized}, client: {supabase is not None}")
         
         # Fallback: Return general health insights
+        logger.info("→ Returning fallback general health insights")
         fallback_insights = [
             {
                 "id": "general-1",
@@ -574,11 +619,16 @@ async def get_health_insights_from_consultations(user_id: str):
             "insights": fallback_insights,
             "database_configured": bool(supabase),
             "source": "general_health_guidelines",
-            "message": "General health recommendations for optimal wellness. These insights are always available to support your health journey."
+            "message": "Complete a consultation to get personalized health insights based on your symptoms and conditions.",
+            "debug_info": {
+                "supabase_initialized": supabase_initialized,
+                "user_id_provided": bool(user_id)
+            }
         }
         
     except Exception as e:
-        print(f"Error getting health insights: {str(e)}")
+        logger.error(f"✗ Error getting health insights: {str(e)}")
+        logger.error(f"   Error type: {type(e).__name__}")
         return {
             "insights": [],
             "error": f"Error getting insights: {str(e)}",
