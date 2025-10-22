@@ -7,82 +7,82 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      {/* Enhanced Navigation Bar */}
-      <nav className="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200 shadow-lg">
+      {/* Enhanced Navigation Bar - Autofy Style */}
+      <nav className="fixed top-0 w-full z-50 py-4 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-medical-green to-medical-green-light rounded-lg flex items-center justify-center shadow-lg">
-                <Stethoscope className="w-6 h-6 text-white" />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between h-16 px-6">
+              {/* Logo/Brand */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                  <Brain className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-xl font-bold text-gray-900">AI Doctor</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">MediCare AI</span>
+
+              {/* Center Navigation - Desktop */}
+              <nav className="hidden md:flex items-center gap-8">
+                <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">Features</a>
+                <a href="#about" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">About</a>
+                <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">How It Works</a>
+                <a href="#contact" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">Contact</a>
+              </nav>
+
+              {/* Right - CTA Buttons */}
+              <div className="hidden md:flex items-center gap-3">
+                <Link 
+                  to="/auth" 
+                  className="text-gray-600 hover:text-emerald-600 hover:bg-gray-50 transition-colors font-medium px-4 py-2 rounded-lg text-sm"
+                >
+                  Sign In
+                </Link>
+                <Link 
+                  to="/auth" 
+                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all"
+                >
+                  Get Started
+                </Link>
+              </div>
+
+              {/* Mobile menu button */}
+              <div className="md:hidden">
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="text-gray-600 hover:text-emerald-600 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+              </div>
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-medical-green transition-colors font-medium px-3 py-2 rounded-lg hover:bg-medical-green-accent">Features</a>
-              <a href="#about" className="text-gray-600 hover:text-medical-green transition-colors font-medium px-3 py-2 rounded-lg hover:bg-medical-green-accent">About</a>
-              <a href="#contact" className="text-gray-600 hover:text-medical-green transition-colors font-medium px-3 py-2 rounded-lg hover:bg-medical-green-accent">Contact</a>
-              <a href="#blog" className="text-gray-600 hover:text-medical-green transition-colors font-medium px-3 py-2 rounded-lg hover:bg-medical-green-accent">Blog</a>
-            </div>
-
-            {/* CTA Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Link 
-                to="/auth" 
-                className="text-gray-600 hover:text-medical-green transition-colors font-medium px-4 py-2 rounded-lg hover:bg-medical-green-accent"
-              >
-                Sign In
-              </Link>
-              <Link 
-                to="/auth" 
-                className="bg-gradient-to-r from-medical-green to-medical-green-light text-white px-6 py-2.5 rounded-lg font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 hover:from-medical-green-dark hover:to-medical-green"
-              >
-                Get Started
-              </Link>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-gray-600 hover:text-medical-green p-2 rounded-lg hover:bg-medical-green-accent transition-colors"
-              >
-                {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          {isMenuOpen && (
-            <div className="md:hidden bg-white/95 backdrop-blur-lg border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                <a href="#features" className="block text-gray-600 hover:text-medical-green px-3 py-2 rounded-lg hover:bg-medical-green-accent transition-colors">Features</a>
-                <a href="#about" className="block text-gray-600 hover:text-medical-green px-3 py-2 rounded-lg hover:bg-medical-green-accent transition-colors">About</a>
-                <a href="#contact" className="block text-gray-600 hover:text-medical-green px-3 py-2 rounded-lg hover:bg-medical-green-accent transition-colors">Contact</a>
-                <a href="#blog" className="block text-gray-600 hover:text-medical-green px-3 py-2 rounded-lg hover:bg-medical-green-accent transition-colors">Blog</a>
-                <div className="pt-4 pb-2 border-t border-gray-200 mt-4">
-                  <Link to="/auth" className="block text-gray-600 hover:text-medical-green px-3 py-2 rounded-lg hover:bg-medical-green-accent transition-colors">Sign In</Link>
-                  <Link to="/auth" className="block bg-gradient-to-r from-medical-green to-medical-green-light text-white px-3 py-2 rounded-lg font-semibold mt-2 text-center">Get Started</Link>
+            {/* Mobile Navigation */}
+            {isMenuOpen && (
+              <div className="md:hidden border-t border-gray-200">
+                <div className="px-4 py-3 space-y-1">
+                  <a href="#features" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Features</a>
+                  <a href="#about" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">About</a>
+                  <a href="#how-it-works" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">How It Works</a>
+                  <a href="#contact" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Contact</a>
+                  <div className="pt-3 pb-2 border-t border-gray-200 mt-3">
+                    <Link to="/auth" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Sign In</Link>
+                    <Link to="/auth" className="block bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 py-2 rounded-lg font-medium mt-2 text-center text-sm">Get Started</Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </nav>
-  
 
-
-      {/* Enhanced Hero Section */}
-      <section className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      {/* Hero Section */}
+      <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
             {/* Hero Content */}
             <div className="flex-1 text-center lg:text-left">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight mb-6 text-gray-900">
                 Your Health <br />
-                <span className="bg-gradient-to-r from-medical-green via-medical-green-light to-primary-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 bg-clip-text text-transparent">
                   Our Care
                 </span>
               </h1>
@@ -94,13 +94,13 @@ const LandingPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Link 
                   to="/auth" 
-                  className="bg-gradient-to-r from-medical-green to-medical-green-light text-white px-8 py-4 rounded-xl font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300 text-center hover:from-medical-green-dark hover:to-medical-green"
+                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-8 py-4 rounded-xl font-semibold shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 text-center"
                 >
                   Start Free Consultation
                 </Link>
                 <a 
                   href="#features" 
-                  className="border-2 border-medical-green text-medical-green px-8 py-4 rounded-xl font-semibold hover:bg-medical-green-accent hover:border-medical-green-light transition-all duration-300 text-center"
+                  className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-8 py-4 rounded-xl font-semibold transition-all duration-300 text-center"
                 >
                   Learn More
                 </a>
@@ -111,7 +111,6 @@ const LandingPage: React.FC = () => {
             <div className="flex-1 flex justify-center lg:justify-end">
               <div className="relative w-80 h-80 sm:w-96 sm:h-96">
                 <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-                  {/* Animated Video */}
                   <video 
                     autoPlay 
                     loop 
@@ -120,17 +119,14 @@ const LandingPage: React.FC = () => {
                     className="w-full h-full object-cover"
                   >
                     <source src="/Animated_Video_Generation_From_Image.mp4" type="video/mp4" />
-                    {/* Fallback image if video doesn't load */}
                     Your browser does not support the video tag.
                   </video>
-                  
-                  {/* Optional subtle overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-medical-green/5 to-transparent pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 to-transparent pointer-events-none"></div>
                 </div>
                 
                 {/* Floating medical icons */}
-                <div className="absolute -top-4 -right-4 w-16 h-16 bg-medical-green-accent rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                  <Stethoscope className="w-8 h-8 text-medical-green" />
+                <div className="absolute -top-4 -right-4 w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                  <Stethoscope className="w-8 h-8 text-emerald-600" />
                 </div>
                 <div className="absolute -bottom-4 -left-4 w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                   <Brain className="w-7 h-7 text-blue-600" />
@@ -142,7 +138,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* AI Medical Illustration Section */}
-      <section className="py-12 lg:py-16 bg-white">
+      <section id="how-it-works" className="py-12 lg:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 lg:mb-12">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
@@ -363,8 +359,8 @@ const LandingPage: React.FC = () => {
                 description: "Get professional medical insights powered by advanced AI models, including differential diagnoses and ICD-10 medical codes."
               }
             ].map((feature, index) => (
-              <div key={index} className="bg-white backdrop-blur-sm border border-gray-200 rounded-2xl p-8 hover:bg-medical-green-accent hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
-                <div className="w-16 h-16 bg-gradient-to-r from-medical-green to-medical-green-light rounded-xl flex items-center justify-center mb-6 mx-auto">
+              <div key={index} className="bg-white backdrop-blur-sm border border-gray-200 rounded-2xl p-8 hover:bg-emerald-50 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
+                <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-6 mx-auto">
                   <feature.icon className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">{feature.title}</h3>
@@ -376,16 +372,16 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Enhanced Footer */}
-      <footer className="bg-gray-900 border-t border-gray-200">
+      <footer className="bg-gray-900 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             {/* Company Info */}
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-medical-green to-medical-green-light rounded-lg flex items-center justify-center">
-                  <Stethoscope className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                  <Brain className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-white">AI Medical Doctor</span>
+                <span className="text-xl font-bold text-white">AI Doctor</span>
               </div>
               <p className="text-gray-300 leading-relaxed">
                 Advanced AI-powered medical consultation platform for modern healthcare.
@@ -396,9 +392,9 @@ const LandingPage: React.FC = () => {
             <div className="text-center">
               <h4 className="text-lg font-semibold text-white mb-4">Quick Links</h4>
               <div className="space-y-2">
-                <a href="#features" className="block text-gray-300 hover:text-medical-green-light transition-colors">Features</a>
-                <a href="#about" className="block text-gray-300 hover:text-medical-green-light transition-colors">About</a>
-                <Link to="/auth" className="block text-gray-300 hover:text-medical-green-light transition-colors">Get Started</Link>
+                <a href="#features" className="block text-gray-300 hover:text-emerald-400 transition-colors">Features</a>
+                <a href="#about" className="block text-gray-300 hover:text-emerald-400 transition-colors">About</a>
+                <Link to="/auth" className="block text-gray-300 hover:text-emerald-400 transition-colors">Get Started</Link>
               </div>
             </div>
 
@@ -413,12 +409,12 @@ const LandingPage: React.FC = () => {
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-gray-700 pt-8 flex flex-col sm:flex-row justify-between items-center text-center">
-            <p className="text-gray-400 text-sm">&copy; 2025 AI Medical Doctor. All rights reserved.</p>
+          <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row justify-between items-center text-center">
+            <p className="text-gray-400 text-sm">&copy; 2025 AI Doctor. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 sm:mt-0">
-              <a href="#privacy" className="text-gray-400 hover:text-medical-green-light text-sm transition-colors">Privacy</a>
-              <a href="#terms" className="text-gray-400 hover:text-medical-green-light text-sm transition-colors">Terms</a>
-              <a href="#contact" className="text-gray-400 hover:text-medical-green-light text-sm transition-colors">Contact</a>
+              <a href="#privacy" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Privacy</a>
+              <a href="#terms" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Terms</a>
+              <a href="#contact" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Contact</a>
             </div>
           </div>
         </div>
@@ -426,5 +422,7 @@ const LandingPage: React.FC = () => {
     </div>
   );
 };
+
+
 
 export default LandingPage;
