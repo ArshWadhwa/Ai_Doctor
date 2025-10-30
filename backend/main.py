@@ -387,9 +387,10 @@ async def medical_consultation(
         # Handle audio transcription if provided
         if audio:
             try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", mode='wb') as temp_audio:
                     audio_content = await audio.read()
                     temp_audio.write(audio_content)
+                    temp_audio.flush()
                     temp_audio_path = temp_audio.name
                 
                 logger.info(f"Transcribing audio from: {temp_audio_path}")
@@ -404,7 +405,10 @@ async def medical_consultation(
                 raise HTTPException(status_code=400, detail=f"Audio transcription failed: {str(audio_error)}")
             finally:
                 if temp_audio_path and os.path.exists(temp_audio_path):
-                    os.unlink(temp_audio_path)
+                    try:
+                        os.unlink(temp_audio_path)
+                    except:
+                        pass
         
         # Handle image analysis if provided
         if image:
@@ -413,50 +417,108 @@ async def medical_consultation(
                 if not image.content_type or not image.content_type.startswith('image/'):
                     raise HTTPException(status_code=400, detail="Please upload a valid image file (JPEG, PNG, etc.)")
                 
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
+                # Determine file extension
+                file_ext = ".jpg"
+                if "png" in image.content_type.lower():
+                    file_ext = ".png"
+                elif "webp" in image.content_type.lower():
+                    file_ext = ".webp"
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, mode='wb') as temp_image:
                     image_content = await image.read()
                     temp_image.write(image_content)
+                    temp_image.flush()
                     temp_image_path = temp_image.name
                 
-                logger.info(f"Analyzing image from: {temp_image_path}")
+                # Verify file was created and has content
+                if not os.path.exists(temp_image_path):
+                    raise HTTPException(status_code=500, detail="Failed to save image file")
                 
-                # Enhanced prompt with medical image validation
+                file_size = os.path.getsize(temp_image_path)
+                if file_size == 0:
+                    raise HTTPException(status_code=400, detail="Uploaded image is empty")
+                
+                logger.info(f"Analyzing image from: {temp_image_path} (size: {file_size} bytes, type: {image.content_type})")
+                
+                # Enhanced prompt - more specific about rejection criteria
                 medical_context = """
-                
-CRITICAL INSTRUCTION: You must ONLY analyze medical images showing health conditions, symptoms, injuries, rashes, wounds, or medical concerns.
-If this image shows a car, vehicle, animal, scenery, food, or any other non-medical subject, respond EXACTLY with:
-"This appears to be a non-medical image. I can only analyze medical images showing symptoms, conditions, wounds, rashes, or health concerns. Please upload a medical image for consultation."
+
+CRITICAL VALIDATION: This AI is designed ONLY for medical image analysis.
+
+REJECT the image ONLY if it clearly shows:
+- Cars, vehicles, motorcycles, trucks
+- Buildings, houses, architecture  
+- Landscapes, scenery, nature (without injuries)
+- Food dishes, meals, restaurants
+- Electronics, gadgets, computers
+- Furniture, household items
+- Random objects unrelated to health
+
+ACCEPT the image if it shows:
+- Any skin condition (acne, rash, wounds, cuts, bruises, infections, lesions, etc.)
+- Body parts with visible symptoms
+- Medical equipment or devices being used on a person
+- Any injury or health concern on a human body
+- Medical scans or test results
+
+If the image is clearly NON-MEDICAL (like the rejection list above), respond with:
+"I cannot analyze this image as it does not show any medical condition. Please upload an image of a health concern, injury, or symptom for consultation."
+
+If the image shows ANY medical condition or symptom, provide your analysis normally.
 """
                 
                 full_prompt = system_prompt + medical_context + (f"\n\nPatient's description: {transcription}" if transcription else "")
                 
+                # Try to encode the image
+                try:
+                    encoded_image = encode_image(temp_image_path)
+                    if not encoded_image:
+                        raise ValueError("Image encoding returned empty result")
+                    logger.info(f"✓ Image encoded successfully (base64 length: {len(encoded_image)})")
+                except Exception as encode_error:
+                    logger.error(f"✗ Image encoding failed: {encode_error}")
+                    raise HTTPException(status_code=400, detail=f"Failed to encode image. Please try a different image format: {str(encode_error)}")
+                
+                # Analyze the image
                 analysis = analyze_image_with_query(
                     full_prompt,
                     "meta-llama/llama-4-scout-17b-16e-instruct",
-                    encode_image(temp_image_path)
+                    encoded_image
                 )
                 
                 logger.info(f"✓ Image analysis received: {analysis[:150]}...")
                 
-                # Check if AI detected non-medical content
-                non_medical_indicators = [
-                    "non-medical image",
-                    "not a medical image",
-                    "cannot analyze this",
-                    "not medical",
-                    "car", "vehicle", "automobile",
-                    "scenery", "landscape",
-                    "food", "meal",
-                    "animal", "pet"
+                # Improved non-medical detection - only flag if AI explicitly says it can't analyze
+                rejection_phrases = [
+                    "cannot analyze this image as it does not show any medical condition",
+                    "i cannot analyze this image",
+                    "this does not appear to be a medical image",
+                    "please upload an image of a health concern"
                 ]
                 
                 analysis_lower = analysis.lower()
-                if any(indicator in analysis_lower for indicator in non_medical_indicators):
+                is_rejected = any(phrase in analysis_lower for phrase in rejection_phrases)
+                
+                # Additional check for obvious non-medical subjects (cars, buildings, etc.)
+                obvious_non_medical = [
+                    "this appears to be a car",
+                    "this appears to be a vehicle", 
+                    "this shows a building",
+                    "this is a landscape",
+                    "this shows food",
+                    "this appears to be furniture"
+                ]
+                
+                has_obvious_non_medical = any(phrase in analysis_lower for phrase in obvious_non_medical)
+                
+                if is_rejected or has_obvious_non_medical:
                     logger.warning(f"⚠ Non-medical image detected: {analysis[:100]}")
                     raise HTTPException(
                         status_code=400,
-                        detail="This appears to be a non-medical image. Please upload an image showing medical symptoms, conditions, wounds, rashes, or other health concerns for consultation."
+                        detail="This image does not appear to show a medical condition. Please upload an image showing symptoms, wounds, rashes, or health concerns for consultation."
                     )
+                
+                logger.info(f"✓ Image validated as medical content")
                 
             except HTTPException:
                 raise
@@ -464,10 +526,19 @@ If this image shows a car, vehicle, animal, scenery, food, or any other non-medi
                 logger.error(f"✗ Image analysis failed: {image_error}")
                 logger.error(f"   Error type: {type(image_error).__name__}")
                 logger.error(f"   Error details: {repr(image_error)}")
-                raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(image_error)}")
+                
+                # Provide more specific error message
+                error_msg = str(image_error)
+                if "invalid image data" in error_msg.lower():
+                    raise HTTPException(status_code=400, detail="The uploaded image format is not supported. Please try a JPEG or PNG image.")
+                else:
+                    raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(image_error)}")
             finally:
                 if temp_image_path and os.path.exists(temp_image_path):
-                    os.unlink(temp_image_path)
+                    try:
+                        os.unlink(temp_image_path)
+                    except:
+                        pass
         
         # Handle voice-only consultation (no image but has transcription)
         elif transcription:
@@ -510,9 +581,11 @@ If this image shows a car, vehicle, animal, scenery, food, or any other non-medi
             try:
                 audio_path = f"temp_response_{os.getpid()}.mp3"
                 text_to_speech_elevenLabs(input_text=analysis, output_filepath=audio_path)
+                logger.info(f"✓ Audio response generated: {audio_path}")
             except Exception as tts_error:
                 logger.error(f"✗ Text-to-speech failed: {tts_error}")
                 # Continue without audio - analysis is still valid
+                audio_path = None
         
         response = {
             "transcription": transcription,
@@ -522,6 +595,7 @@ If this image shows a car, vehicle, animal, scenery, food, or any other non-medi
             "saved_to_database": bool(consultation_id)
         }
         
+        logger.info(f"✓ Consultation completed successfully")
         return response
     
     except HTTPException:
