@@ -377,43 +377,107 @@ async def medical_consultation(
     user_id: str = None
 ):
     """Complete medical consultation with image and audio"""
+    temp_audio_path = None
+    temp_image_path = None
+    
     try:
         transcription = ""
         analysis = ""
         
         # Handle audio transcription if provided
         if audio:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-                audio_content = await audio.read()
-                temp_audio.write(audio_content)
-                temp_audio_path = temp_audio.name
-            
-            transcription = transcribe_with_groq(
-                GROQ_API_KEY=os.environ.get("GROQ_API_KEY"),
-                audio_filepath=temp_audio_path,
-                stt_model="whisper-large-v3"
-            )
-            os.unlink(temp_audio_path)
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                    audio_content = await audio.read()
+                    temp_audio.write(audio_content)
+                    temp_audio_path = temp_audio.name
+                
+                logger.info(f"Transcribing audio from: {temp_audio_path}")
+                transcription = transcribe_with_groq(
+                    GROQ_API_KEY=os.environ.get("GROQ_API_KEY"),
+                    audio_filepath=temp_audio_path,
+                    stt_model="whisper-large-v3"
+                )
+                logger.info(f"✓ Transcription successful: {transcription[:100]}...")
+            except Exception as audio_error:
+                logger.error(f"✗ Audio transcription failed: {audio_error}")
+                raise HTTPException(status_code=400, detail=f"Audio transcription failed: {str(audio_error)}")
+            finally:
+                if temp_audio_path and os.path.exists(temp_audio_path):
+                    os.unlink(temp_audio_path)
         
         # Handle image analysis if provided
         if image:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
-                image_content = await image.read()
-                temp_image.write(image_content)
-                temp_image_path = temp_image.name
-            
-            full_prompt = system_prompt + transcription if transcription else system_prompt
-            analysis = analyze_image_with_query(
-                full_prompt,
-                "meta-llama/llama-4-scout-17b-16e-instruct",
-                encode_image(temp_image_path)
-            )
-            os.unlink(temp_image_path)
+            try:
+                # Validate file type
+                if not image.content_type or not image.content_type.startswith('image/'):
+                    raise HTTPException(status_code=400, detail="Please upload a valid image file (JPEG, PNG, etc.)")
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
+                    image_content = await image.read()
+                    temp_image.write(image_content)
+                    temp_image_path = temp_image.name
+                
+                logger.info(f"Analyzing image from: {temp_image_path}")
+                
+                # Enhanced prompt with medical image validation
+                medical_context = """
+                
+CRITICAL INSTRUCTION: You must ONLY analyze medical images showing health conditions, symptoms, injuries, rashes, wounds, or medical concerns.
+If this image shows a car, vehicle, animal, scenery, food, or any other non-medical subject, respond EXACTLY with:
+"This appears to be a non-medical image. I can only analyze medical images showing symptoms, conditions, wounds, rashes, or health concerns. Please upload a medical image for consultation."
+"""
+                
+                full_prompt = system_prompt + medical_context + (f"\n\nPatient's description: {transcription}" if transcription else "")
+                
+                analysis = analyze_image_with_query(
+                    full_prompt,
+                    "meta-llama/llama-4-scout-17b-16e-instruct",
+                    encode_image(temp_image_path)
+                )
+                
+                logger.info(f"✓ Image analysis received: {analysis[:150]}...")
+                
+                # Check if AI detected non-medical content
+                non_medical_indicators = [
+                    "non-medical image",
+                    "not a medical image",
+                    "cannot analyze this",
+                    "not medical",
+                    "car", "vehicle", "automobile",
+                    "scenery", "landscape",
+                    "food", "meal",
+                    "animal", "pet"
+                ]
+                
+                analysis_lower = analysis.lower()
+                if any(indicator in analysis_lower for indicator in non_medical_indicators):
+                    logger.warning(f"⚠ Non-medical image detected: {analysis[:100]}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="This appears to be a non-medical image. Please upload an image showing medical symptoms, conditions, wounds, rashes, or other health concerns for consultation."
+                    )
+                
+            except HTTPException:
+                raise
+            except Exception as image_error:
+                logger.error(f"✗ Image analysis failed: {image_error}")
+                logger.error(f"   Error type: {type(image_error).__name__}")
+                logger.error(f"   Error details: {repr(image_error)}")
+                raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(image_error)}")
+            finally:
+                if temp_image_path and os.path.exists(temp_image_path):
+                    os.unlink(temp_image_path)
         
         # Handle voice-only consultation (no image but has transcription)
         elif transcription:
-            full_prompt = voice_only_prompt.replace("[transcribed_symptoms]", transcription)
-            analysis = analyze_text_only(full_prompt)
+            try:
+                full_prompt = voice_only_prompt.replace("[transcribed_symptoms]", transcription)
+                analysis = analyze_text_only(full_prompt)
+                logger.info(f"✓ Text-only analysis successful")
+            except Exception as text_error:
+                logger.error(f"✗ Text analysis failed: {text_error}")
+                raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(text_error)}")
         
         if not analysis and not transcription:
             raise HTTPException(status_code=400, detail="Please provide either an image or audio recording for consultation")
@@ -443,21 +507,29 @@ async def medical_consultation(
         # Generate audio response
         audio_path = None
         if analysis:
-            audio_path = f"temp_response_{os.getpid()}.mp3"
-            text_to_speech_elevenLabs(input_text=analysis, output_filepath=audio_path)
+            try:
+                audio_path = f"temp_response_{os.getpid()}.mp3"
+                text_to_speech_elevenLabs(input_text=analysis, output_filepath=audio_path)
+            except Exception as tts_error:
+                logger.error(f"✗ Text-to-speech failed: {tts_error}")
+                # Continue without audio - analysis is still valid
         
         response = {
             "transcription": transcription,
             "analysis": analysis,
-            "audio_url": f"/download-audio/{audio_path}" if audio_path else None,
+            "audio_url": f"/download-audio/{audio_path}" if audio_path and os.path.exists(audio_path) else None,
             "consultation_id": consultation_id,
             "saved_to_database": bool(consultation_id)
         }
         
         return response
     
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Medical consultation error: {e}")
+        logger.error(f"✗ Medical consultation error: {e}")
+        logger.error(f"   Error type: {type(e).__name__}")
+        logger.error(f"   Error details: {repr(e)}")
         raise HTTPException(status_code=500, detail=f"Consultation failed: {str(e)}")
 
 @app.get("/medical-consultation")
@@ -554,7 +626,7 @@ async def get_health_insights_from_consultations(user_id: str):
                 consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
                 
                 logger.info(f"   Database response received: {len(consultations_response.data) if consultations_response.data else 0} consultations")
-                
+                logger.info(f"   Consultation data: {consultations_response.data}")
                 if consultations_response.data and len(consultations_response.data) > 0:
                     all_remedies = []
                     for idx, consultation in enumerate(consultations_response.data):
@@ -724,30 +796,6 @@ async def generate_health_insights_from_consultations(request: dict):
                 "id": "wellness-1",
                 "issue": "Nutrition Balance",
                 "advice": "Maintain a balanced diet rich in fruits, vegetables, whole grains, and lean proteins to support optimal body function and immune health.",
-                "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "wellness-2", 
-                "issue": "Physical Wellness",
-                "advice": "Incorporate regular physical activity into your routine, even light activities like walking can significantly improve circulation and mood.",
-                "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "wellness-3",
-                "issue": "Health Monitoring",
-                "advice": "Keep track of your body's signals and any recurring symptoms. Early awareness helps in timely medical intervention when needed.",
-                "urgency": "high",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "wellness-4",
-                "issue": "Mental Wellness",
-                "advice": "Prioritize mental health through adequate rest, social connections, and stress management techniques like deep breathing or mindfulness.",
                 "urgency": "medium",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
