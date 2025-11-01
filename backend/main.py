@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
@@ -167,7 +167,13 @@ Here is a medical image and a patient question. Image: [image]. Patient says: [t
 
 voice_only_prompt = """
 You are acting as a professional doctor for educational purposes only. This is not a replacement for real medical advice, and you should kindly remind the patient to consult a certified doctor for confirmation and proper treatment. 
-Based only on the patient’s described symptoms, respond in a clear, conversational, and caring tone as though you are speaking directly to them. Keep your impression short and warm, ideally two to three sentences, but ensure it conveys clinical value. You may gently suggest general wellness measures such as rest, hydration, light nutrition, or basic home remedies if appropriate, while emphasizing that these are only supportive options and not definitive care. 
+
+Based on the patient's described symptoms: "[transcribed_symptoms]"
+
+Respond in a clear, conversational, and caring tone as though you are speaking directly to them. Keep your impression short and warm, ideally two to three sentences, but ensure it conveys clinical value. 
+
+You may gently suggest general wellness measures such as rest, hydration, light nutrition, or basic home remedies if appropriate, while emphasizing that these are only supportive options and not definitive care. 
+
 If you identify a likely condition, explain it briefly and provide the most relevant ICD-10 code at the end in parentheses. If you are not completely certain, offer a few possible conditions with their ICD-10 codes and always advise the patient to arrange a follow-up consultation with a qualified healthcare provider.
 """
 
@@ -374,9 +380,10 @@ async def convert_text_to_speech(text_input: dict):
 async def medical_consultation(
     image: UploadFile = File(None),
     audio: UploadFile = File(None),
-    user_id: str = None
+    text_input: str = Form(None),
+    user_id: str = Form(None)
 ):
-    """Complete medical consultation with image and audio"""
+    """Complete medical consultation with image, audio, or text"""
     temp_audio_path = None
     temp_image_path = None
     
@@ -384,8 +391,13 @@ async def medical_consultation(
         transcription = ""
         analysis = ""
         
-        # Handle audio transcription if provided
-        if audio:
+        # ✅ Priority 1: Text input
+        if text_input:
+            transcription = text_input.strip()
+            logger.info(f"✓ Text input received: {transcription[:100]}...")
+        
+        # ✅ Priority 2: Audio transcription
+        elif audio:
             try:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", mode='wb') as temp_audio:
                     audio_content = await audio.read()
@@ -467,7 +479,9 @@ If the image is clearly NON-MEDICAL (like the rejection list above), respond wit
 If the image shows ANY medical condition or symptom, provide your analysis normally.
 """
                 
-                full_prompt = system_prompt + medical_context + (f"\n\nPatient's description: {transcription}" if transcription else "")
+                full_prompt = system_prompt + medical_context + (
+                    f"\n\nPatient's description: {transcription}" if transcription else ""
+                )
                 
                 # Try to encode the image
                 try:
@@ -540,18 +554,25 @@ If the image shows ANY medical condition or symptom, provide your analysis norma
                     except:
                         pass
         
-        # Handle voice-only consultation (no image but has transcription)
+        # ✅ Handle text-only or voice-only consultation (no image)
         elif transcription:
             try:
+                # ✅ FIXED: Properly replace the placeholder with actual symptoms
                 full_prompt = voice_only_prompt.replace("[transcribed_symptoms]", transcription)
+                logger.info(f"✓ Formatted text-only prompt: {full_prompt[:200]}...")
+                
                 analysis = analyze_text_only(full_prompt)
-                logger.info(f"✓ Text-only analysis successful")
+                logger.info(f"✓ Text/Voice-only analysis successful: {analysis[:100]}...")
             except Exception as text_error:
                 logger.error(f"✗ Text analysis failed: {text_error}")
                 raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(text_error)}")
         
+        # ✅ Updated validation
         if not analysis and not transcription:
-            raise HTTPException(status_code=400, detail="Please provide either an image or audio recording for consultation")
+            raise HTTPException(
+                status_code=400, 
+                detail="Please provide symptoms via text, voice recording, or medical image"
+            )
         
         # Save consultation to database if Supabase is available
         consultation_id = None
@@ -921,4 +942,8 @@ async def download_audio(filename: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Use app object directly instead of string reference to avoid module import issues
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+    port = int(os.getenv("PORT", 8000))
+    # Use app object directly instead of string reference to avoid module import issues
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)

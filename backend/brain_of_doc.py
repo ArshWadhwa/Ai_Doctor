@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from functools import lru_cache
+import requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -61,20 +62,46 @@ def analyze_image_with_query(query,model,encoded_image):
 
     return chat_completition.choices[0].message.content
 
-def analyze_text_only(query):
-    """Analyze text-only queries without images"""
-    client = get_groq_client()  # Use singleton client
+def analyze_text_only(query: str, model: str = "meta-llama/llama-4-scout-17b-16e-instruct") -> str:
+    """
+    Analyze text-only medical consultation using OpenRouter API
     
-    messages = [
-        {
-            "role": "user",
-            "content": query
-        }
-    ]
+    Args:
+        query: Complete prompt with symptoms already included
+        model: AI model to use
+        
+    Returns:
+        Medical analysis text
+    """
+    url = "https://openrouter.ai/api/v1/chat/completions"
     
-    chat_completion = client.chat.completions.create(
-        messages=messages,
-        model="meta-llama/llama-4-scout-17b-16e-instruct"
-    )
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+        "Content-Type": "application/json"
+    }
     
-    return chat_completion.choices[0].message.content
+    # ✅ Use the complete query as-is (already has symptoms)
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": query  # This should already be the complete formatted prompt
+            }
+        ]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        
+        if 'choices' in result and len(result['choices']) > 0:
+            analysis = result['choices'][0]['message']['content']
+            return analysis.strip()
+        else:
+            return "Unable to generate analysis. Please try again."
+            
+    except Exception as e:
+        print(f"Error in analyze_text_only: {e}")
+        return f"Error analyzing symptoms: {str(e)}"
