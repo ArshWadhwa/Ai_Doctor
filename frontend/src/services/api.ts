@@ -44,35 +44,36 @@ export interface ConsultationResult {
 export const consultationService = {
   // Complete medical consultation with image and/or audio
   async medicalConsultation(
-    image?: File | null, 
-    audio?: Blob | null
+    image: File | null, 
+    audio: Blob | null,
+    textInput?: string  // ✅ ADD THIS PARAMETER
   ): Promise<ConsultationResult> {
+    const formData = new FormData();
+    
+    if (image) {
+      formData.append('image', image);
+    }
+    
+    if (audio) {
+      formData.append('audio', audio, 'audio.wav');
+    }
+    
+    // ✅ ADD TEXT INPUT TO FORMDATA
+    if (textInput) {
+      formData.append('text_input', textInput);
+    }
+
     try {
-      console.log('Starting consultation...', { hasImage: !!image, hasAudio: !!audio });
-      
-      const formData = new FormData();
-      
-      if (image) {
-        console.log('Adding image to form data:', image.name, image.type, image.size);
-        formData.append('image', image);
-      }
-      
-      if (audio) {
-        // Convert Blob to File for proper form data
-        const audioFile = new File([audio], 'recording.wav', { type: 'audio/wav' });
-        console.log('Adding audio to form data:', audioFile.name, audioFile.type, audioFile.size);
-        formData.append('audio', audioFile);
-      }
+      const response = await axios.post(
+        `${API_BASE_URL}/medical-consultation`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
-      console.log('Making API request to:', `${API_BASE_URL}/medical-consultation`);
-      
-      const response = await api.post('/medical-consultation', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      console.log('API response received:', response.status);
       return response.data;
     } catch (error) {
       console.error('Consultation API Error:', error);

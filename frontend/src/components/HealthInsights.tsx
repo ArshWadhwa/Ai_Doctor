@@ -150,11 +150,13 @@ const HealthInsights: React.FC = () => {
       fetchStoredInsights();
       checkForNewConsultations();
     }
-  }, [user?.id]);
+  }, [user?.id]); // Remove checkForNewConsultations from dependencies
 
   useEffect(() => {
-    checkForNewConsultations();
-  }, [insights]);
+    if (insights.length > 0) {
+      checkForNewConsultations();
+    }
+  }, [insights]); // Separate effect for checking consultations when insights change
 
   // Calculate real chart data from actual consultations and insights
   const getChartData = () => {
@@ -224,22 +226,6 @@ const HealthInsights: React.FC = () => {
       const y = baseY - ((value / maxValue) * (baseY - maxY));
       return `${x},${y}`;
     }).join(' ');
-  };
-
-  const getUrgencyColor = (urgency: string = 'low') => {
-    switch (urgency.toLowerCase()) {
-      case 'high': return 'border-red-400 bg-red-50';
-      case 'medium': return 'border-yellow-400 bg-yellow-50';
-      default: return 'border-blue-400 bg-blue-50';
-    }
-  };
-
-  const getUrgencyIcon = (urgency: string = 'low') => {
-    switch (urgency.toLowerCase()) {
-      case 'high': return <AlertTriangle className="w-6 h-6 text-red-600" />;
-      case 'medium': return <TrendingUp className="w-6 h-6 text-yellow-600" />;
-      default: return <Shield className="w-6 h-6 text-blue-600" />;
-    }
   };
 
   return (

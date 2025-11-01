@@ -8,6 +8,7 @@ import './App.css';
 import Dashboard from './components/Dashboard';
 import ConsultationHistory from './components/ConsultationHistory';
 import HealthInsights from './components/HealthInsights';
+import Profile from './components/Profile';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -79,6 +80,7 @@ function App() {
               } 
             />
             <Route path="/health-insights" element={<ProtectedRoute><HealthInsights /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
             <Route 
               path="/consultation" 

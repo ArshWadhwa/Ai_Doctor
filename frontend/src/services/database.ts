@@ -1,10 +1,22 @@
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
-// Export supabase for direct use in components
-export { supabase };
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
-// types
+console.log('Supabase Config:', {
+  url: supabaseUrl,
+  keyLength: supabaseAnonKey.length
+});
 
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
+// Types
 export interface UserProfile {
   id: string;
   full_name: string;
@@ -12,9 +24,10 @@ export interface UserProfile {
   created_at: string;
   updated_at: string;
 }
-export interface Consultation{
-    id: string;
-    user_id: string;
+
+export interface Consultation {
+  id: string;
+  user_id: string;
   consultation_type: 'voice' | 'image' | 'combined';
   transcription: string | null;
   analysis: string | null;
@@ -23,7 +36,6 @@ export interface Consultation{
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
 }
-
 
 export interface HealthMetric {
   id: string;

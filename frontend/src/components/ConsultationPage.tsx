@@ -34,7 +34,7 @@ const ConsultationPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [textSymptoms, setTextSymptoms] = useState('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -91,9 +91,9 @@ const ConsultationPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-
-    if (!audioBlob && !selectedImage) {
-      setError('Please provide either an audio recording or an image for analysis.');
+    // ✅ Validation is already correct
+    if (!audioBlob && !selectedImage && !textSymptoms) {
+      setError('Please provide symptoms via text, voice, or image.');
       return;
     }
 
@@ -101,34 +101,37 @@ const ConsultationPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await consultationService.medicalConsultation(selectedImage, audioBlob);
+      // ✅ PASS textSymptoms to API
+      const response = await consultationService.medicalConsultation(
+        selectedImage, 
+        audioBlob,
+        textSymptoms  // ✅ ADD THIS PARAMETER
+      );
+      
       setResult(response);
 
-   // Save to Supabase database
-    const consultationData = {
-       user_id: user?.id ?? 'guest',
-consultation_type: (selectedImage && audioBlob 
-  ? 'combined' 
-  : selectedImage 
-    ? 'image' 
-    : 'voice') as 'combined' | 'image' | 'voice',
-      transcription: response.transcription || null,
-      analysis: response.analysis || null,
-      audio_url: response.audio_url || null,
-      image_url: selectedImage ? URL.createObjectURL(selectedImage) : null,
-      status: 'completed' as const
-    };
+      // Save to Supabase database
+      const consultationData = {
+        user_id: user?.id ?? 'guest',
+        consultation_type: (selectedImage && (audioBlob || textSymptoms)
+          ? 'combined' 
+          : selectedImage 
+            ? 'image' 
+            : 'voice') as 'combined' | 'image' | 'voice',
+        transcription: response.transcription || null,
+        analysis: response.analysis || null,
+        audio_url: response.audio_url || null,
+        image_url: selectedImage ? URL.createObjectURL(selectedImage) : null,
+        status: 'completed' as const
+      };
 
-    const { data: savedConsultation, error: dbError } = await dbConsultationService.createConsultation(consultationData);
+      const { data: savedConsultation, error: dbError } = await dbConsultationService.createConsultation(consultationData);
 
-    if (dbError) {
-      console.error('Error saving consultation to database:', dbError);
-      // Don't show error to user since they got their results, just log it
-    } else {
-      console.log('Consultation saved successfully:', savedConsultation);
-    }
-
-    
+      if (dbError) {
+        console.error('Error saving consultation to database:', dbError);
+      } else {
+        console.log('Consultation saved successfully:', savedConsultation);
+      }
     } catch (err) {
       setError('Failed to process consultation. Please try again.');
       console.error('Consultation error:', err);
@@ -155,6 +158,7 @@ consultation_type: (selectedImage && audioBlob
     setImagePreview(null);
     setResult(null);
     setError(null);
+    setTextSymptoms('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -244,6 +248,33 @@ consultation_type: (selectedImage && audioBlob
                   <p className="text-red-800 font-medium">{error}</p>
                 </div>
               )}
+
+              {/* ✅ NEW: Text Symptoms Section (MOVED TO TOP) */}
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-2xl p-6 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <Stethoscope className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Describe Your Symptoms</h3>
+                    <p className="text-gray-600 text-sm">Type your health concerns in detail</p>
+                  </div>
+                </div>
+                <textarea
+                  value={textSymptoms}
+                  onChange={(e) => setTextSymptoms(e.target.value)}
+                  placeholder="Example: I have been experiencing a persistent headache and mild fever for the past 2 days. The headache is more severe in the mornings..."
+                  rows={5}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 placeholder-gray-400 resize-none"
+                />
+                <p className="text-gray-600 text-sm mt-2">
+                  💡 <strong>Tip:</strong> Be specific about when symptoms started, their intensity, and any triggers.
+                </p>
+              </div>
+
+              <div className="text-center">
+                <p className="text-gray-500 font-medium mb-4">OR</p>
+              </div>
 
               <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
                 {/* Audio Recording Section */}
@@ -357,7 +388,7 @@ consultation_type: (selectedImage && audioBlob
               <div className="text-center">
                 <button
                   onClick={handleSubmit}
-                  disabled={isLoading || (!audioBlob && !selectedImage)}
+                  disabled={isLoading || (!audioBlob && !selectedImage && !textSymptoms)} // ✅ Changed this line
                   className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-lg px-12 py-4 rounded-2xl flex items-center justify-center gap-3 mx-auto transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-xl shadow-emerald-500/25 min-w-[280px]"
                 >
                   {isLoading ? (
@@ -500,3 +531,4 @@ consultation_type: (selectedImage && audioBlob
 };
 
 export default ConsultationPage;
+  
