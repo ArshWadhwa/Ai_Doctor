@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import {useAuth} from '../contexts/AuthContext';
-
+import { useAuth } from '../contexts/AuthContext';
+import { AsklepiosCross, ActionPlusButton } from './BrandElements';
 import { consultationService as dbConsultationService } from '../services/database';
 import { 
-  Stethoscope, 
   Mic, 
   MicOff, 
   Upload, 
@@ -13,10 +12,15 @@ import {
   Play, 
   Pause,
   Loader,
-  Brain
+  CheckCircle2,
+  Sparkles,
+  Volume2,
+  AlertCircle,
+  FileText,
+  ShieldCheck,
+  RotateCcw
 } from 'lucide-react';
 import { consultationService, API_BASE_URL } from '../services/api';
-import { stat } from 'fs';
 
 interface ConsultationResult {
   transcription: string;
@@ -25,8 +29,9 @@ interface ConsultationResult {
 }
 
 const ConsultationPage: React.FC = () => {
-    const { user } = useAuth();
+  const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -35,12 +40,15 @@ const ConsultationPage: React.FC = () => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [textSymptoms, setTextSymptoms] = useState('');
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startRecording = async () => {
     try {
+      setError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -54,12 +62,18 @@ const ConsultationPage: React.FC = () => {
         const blob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
       };
+
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
 
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      setError('Failed to access microphone. Please check permissions.');
+      setError('Failed to access microphone. Please check your browser audio permissions.');
     }
   };
 
@@ -67,6 +81,7 @@ const ConsultationPage: React.FC = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
   };
 
@@ -91,9 +106,8 @@ const ConsultationPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    // ✅ Validation is already correct
-    if (!audioBlob && !selectedImage && !textSymptoms) {
-      setError('Please provide symptoms via text, voice, or image.');
+    if (!audioBlob && !selectedImage && !textSymptoms.trim()) {
+      setError('Please provide symptoms via voice recording, clinical text, or medical imaging.');
       return;
     }
 
@@ -101,11 +115,10 @@ const ConsultationPage: React.FC = () => {
     setError(null);
 
     try {
-      // ✅ PASS textSymptoms to API
       const response = await consultationService.medicalConsultation(
         selectedImage, 
         audioBlob,
-        textSymptoms  // ✅ ADD THIS PARAMETER
+        textSymptoms
       );
       
       setResult(response);
@@ -118,22 +131,16 @@ const ConsultationPage: React.FC = () => {
           : selectedImage 
             ? 'image' 
             : 'voice') as 'combined' | 'image' | 'voice',
-        transcription: response.transcription || null,
+        transcription: response.transcription || (textSymptoms ? textSymptoms : null),
         analysis: response.analysis || null,
         audio_url: response.audio_url || null,
         image_url: selectedImage ? URL.createObjectURL(selectedImage) : null,
         status: 'completed' as const
       };
 
-      const { data: savedConsultation, error: dbError } = await dbConsultationService.createConsultation(consultationData);
-
-      if (dbError) {
-        console.error('Error saving consultation to database:', dbError);
-      } else {
-        console.log('Consultation saved successfully:', savedConsultation);
-      }
+      await dbConsultationService.createConsultation(consultationData);
     } catch (err) {
-      setError('Failed to process consultation. Please try again.');
+      setError('Diagnostic processing encountered an issue. Please verify backend connectivity.');
       console.error('Consultation error:', err);
     } finally {
       setIsLoading(false);
@@ -159,220 +166,242 @@ const ConsultationPage: React.FC = () => {
     setResult(null);
     setError(null);
     setTextSymptoms('');
+    setRecordingSeconds(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
+  const formatSeconds = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const remaining = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - Autofy Style Navigation */}
-      <header className="sticky top-0 z-50 py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between h-16 px-6">
-              {/* Left - Logo/Brand */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">AI Doctor</span>
-              </div>
-
-              {/* Center - Navigation Links */}
-              <nav className="hidden md:flex items-center gap-8">
-                <Link 
-                  to="/dashboard" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  Dashboard
-                </Link>
-                <Link 
-                  to="/consultation" 
-                  className="text-emerald-600 font-semibold text-sm relative pb-1"
-                >
-                  Consultation
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 rounded-full"></span>
-                </Link>
-                <Link 
-                  to="/health-insights" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  Insights
-                </Link>
-                <Link 
-                  to="/consultation-history" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  History
-                </Link>
-              </nav>
-
-              {/* Right - Action Buttons */}
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/dashboard"
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-emerald-600 hover:bg-gray-50 rounded-lg transition-colors font-medium"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Dashboard</span>
-                </Link>
-              </div>
+    <div className="min-h-screen bg-[#edf2f7] py-4 sm:py-6 px-2 sm:px-6 lg:px-8 antialiased text-slate-900 flex flex-col items-center">
+      <div className="w-full max-w-[1240px] flex flex-col gap-6">
+        
+        {/* Navigation Bar */}
+        <header className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm px-6 sm:px-8 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3 group focus:outline-none">
+            <div className="w-9 h-9 flex items-center justify-center text-slate-900 group-hover:rotate-90 transition-transform">
+              <AsklepiosCross size={24} />
             </div>
-          </div>
-        </div>
-      </header>
+            <span className="font-bold text-xl tracking-tight text-slate-900">
+              Medly
+            </span>
+          </Link>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl mb-6 shadow-xl">
-            <Stethoscope className="w-10 h-10 text-white" />
+          <nav className="hidden md:flex items-center gap-7">
+            <Link 
+              to="/dashboard" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Dashboard
+            </Link>
+            <Link 
+              to="/consultation" 
+              className="text-sm font-semibold text-blue-600 relative py-1"
+            >
+              Consultation
+              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+            </Link>
+            <Link 
+              to="/health-insights" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Insights
+            </Link>
+            <Link 
+              to="/consultation-history" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              History
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Dashboard</span>
+            </Link>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-            AI Medical Consultation
-          </h2>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Get instant AI-powered medical analysis by describing your symptoms or uploading medical images
+        </header>
+
+        {/* Header Hero Title */}
+        <div className="text-center py-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 mb-3">
+            <Sparkles size={14} /> Multi-Modal Diagnostic Console
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-950 tracking-tight">
+            AI Clinical Consultation
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-xl mx-auto">
+            Provide symptoms by recording your voice, typing clinical notes, or attaching medical images. Medly generates differential assessment with ICD-10 coding.
           </p>
         </div>
 
-        <div className="bg-white backdrop-blur-sm border border-gray-200 rounded-3xl p-8 sm:p-10 lg:p-12 shadow-xl">
-          {!result ? (
-            <div className="space-y-10">
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <X className="w-4 h-4 text-red-600" />
-                  </div>
-                  <p className="text-red-800 font-medium">{error}</p>
-                </div>
-              )}
+        {/* Main Consultation Card */}
+        <main className="bg-white rounded-3xl sm:rounded-[36px] border border-slate-200/80 shadow-xl p-6 sm:p-10 lg:p-12 relative overflow-hidden">
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-700 text-xs sm:text-sm animate-in fade-in">
+              <AlertCircle size={18} className="flex-shrink-0 text-red-500" />
+              <p>{error}</p>
+            </div>
+          )}
 
-              {/* ✅ NEW: Text Symptoms Section (MOVED TO TOP) */}
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-2xl p-6 sm:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                    <Stethoscope className="w-6 h-6 text-white" />
+          {!result ? (
+            <div className="space-y-8">
+              {/* Text Description Box */}
+              <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600">
+                      <FileText size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Symptom Description</h3>
+                      <p className="text-[11px] text-slate-500">Provide details regarding onset, severity, and triggers</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Describe Your Symptoms</h3>
-                    <p className="text-gray-600 text-sm">Type your health concerns in detail</p>
-                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">Text or Spoken</span>
                 </div>
+
                 <textarea
                   value={textSymptoms}
                   onChange={(e) => setTextSymptoms(e.target.value)}
-                  placeholder="Example: I have been experiencing a persistent headache and mild fever for the past 2 days. The headache is more severe in the mornings..."
-                  rows={5}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 placeholder-gray-400 resize-none"
+                  placeholder="e.g. Sharp pain in lower right abdomen starting 4 hours ago, accompanied by low-grade fever and mild nausea..."
+                  rows={4}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all resize-none"
                 />
-                <p className="text-gray-600 text-sm mt-2">
-                  💡 <strong>Tip:</strong> Be specific about when symptoms started, their intensity, and any triggers.
-                </p>
               </div>
 
-              <div className="text-center">
-                <p className="text-gray-500 font-medium mb-4">OR</p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
-                {/* Audio Recording Section */}
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 sm:p-8 hover:bg-emerald-50 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <Mic className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Record Symptoms</h3>
-                      <p className="text-gray-600 text-sm">Describe your condition</p>
-                    </div>
-                  </div>
-                  
-                  <div className="text-center space-y-4">
-                    {!audioBlob ? (
-                      <>
-                        <button
-                          onClick={isRecording ? stopRecording : startRecording}
-                          disabled={isLoading}
-                          className={`w-full ${
-                            isRecording 
-                              ? 'bg-gradient-to-r from-red-500 to-red-600 animate-pulse shadow-red-500/25' 
-                              : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25'
-                          } text-white font-semibold px-6 py-4 rounded-xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none shadow-xl`}
-                        >
-                          {isRecording ? (
-                            <>
-                              <MicOff className="w-5 h-5" />
-                              <span>Stop Recording</span>
-                            </>
-                          ) : (
-                            <>
-                              <Mic className="w-5 h-5" />
-                              <span>Start Recording</span>
-                            </>
-                          )}
-                        </button>
-                        <p className="text-gray-600 text-sm">Click to start voice recording</p>
-                      </>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                          <p className="text-green-700 font-semibold text-lg flex items-center justify-center gap-2">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Audio recorded successfully
-                          </p>
+              {/* Two Column Grid: Voice & Image Upload */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Voice Recording Box */}
+                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600">
+                          <Mic size={16} />
                         </div>
-                        <button 
-                          onClick={() => setAudioBlob(null)} 
-                          className="text-red-600 border border-red-300 hover:bg-red-600 hover:text-white px-6 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Voice Note</h3>
+                          <p className="text-[11px] text-slate-500">Natural spoken audio recording</p>
+                        </div>
+                      </div>
+                      {isRecording && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-mono font-bold rounded-full animate-pulse flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-red-600" />
+                          {formatSeconds(recordingSeconds)}
+                        </span>
+                      )}
+                    </div>
+
+                    {!audioBlob ? (
+                      <div className="py-4 text-center">
+                        {isRecording ? (
+                          <div className="space-y-4">
+                            {/* Visual Waveform Simulation */}
+                            <div className="h-16 bg-white rounded-2xl border border-slate-200 p-3 flex items-center justify-center gap-1">
+                              {[35, 70, 45, 90, 60, 40, 85, 95, 65, 40, 80, 50, 75, 90, 40].map((h, i) => (
+                                <div
+                                  key={i}
+                                  className="w-1.5 bg-red-500 rounded-full animate-pulse"
+                                  style={{
+                                    height: `${Math.min(h, 90)}%`,
+                                    animationDuration: `${0.4 + (i % 5) * 0.15}s`
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              onClick={stopRecording}
+                              className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 shadow-md shadow-red-500/20 active:scale-95 transition-all"
+                            >
+                              <MicOff size={16} />
+                              <span>Stop Recording ({formatSeconds(recordingSeconds)})</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <button
+                              onClick={startRecording}
+                              disabled={isLoading}
+                              className="w-full py-4 px-4 bg-white hover:bg-blue-50 border border-slate-200/80 hover:border-blue-300 text-slate-800 hover:text-blue-700 rounded-2xl font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                            >
+                              <Mic size={18} className="text-blue-600" />
+                              <span>Click to Record Symptoms</span>
+                            </button>
+                            <p className="text-[11px] text-slate-400">Speak clearly near your microphone</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-white rounded-2xl border border-emerald-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold">
+                          <CheckCircle2 size={16} />
+                          <span>Voice Recording Saved</span>
+                        </div>
+                        <button
+                          onClick={() => setAudioBlob(null)}
+                          className="text-xs text-red-600 hover:underline font-medium"
                         >
-                          Record Again
+                          Re-record
                         </button>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Image Upload Section */}
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 sm:p-8 hover:bg-emerald-50 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-white" />
+                {/* Medical Scan Dropzone */}
+                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-sky-600">
+                          <Upload size={16} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Medical Imaging</h3>
+                          <p className="text-[11px] text-slate-500">X-Rays, Derm photos, MRI slices</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Upload Image</h3>
-                      <p className="text-gray-600 text-sm">Medical scans or photos</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
+
                     {!imagePreview ? (
                       <div
-                        className="border-2 border-dashed border-gray-300 hover:border-emerald-500 bg-white hover:bg-emerald-50 rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 group"
                         onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/40 rounded-2xl p-6 text-center cursor-pointer transition-all group"
                       >
-                        <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                          <Upload className="w-8 h-8 text-white" />
-                        </div>
-                        <p className="text-lg font-semibold text-gray-900 mb-2">Upload Medical Image</p>
-                        <span className="text-gray-600 text-sm">JPG, PNG, GIF supported</span>
+                        <Upload size={24} className="mx-auto text-slate-400 group-hover:text-blue-600 mb-2 transition-colors" />
+                        <p className="text-xs font-bold text-slate-800">Attach Medical Image</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, DICOM preview supported</p>
                       </div>
                     ) : (
-                      <div className="relative group">
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900">
                         <img 
                           src={imagePreview} 
-                          alt="Medical upload" 
-                          className="w-full rounded-xl shadow-xl border border-gray-200"
+                          alt="Medical scan preview" 
+                          className="w-full h-36 object-contain"
                         />
                         <button
                           onClick={removeImage}
-                          className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-all duration-200 transform hover:scale-110 opacity-0 group-hover:opacity-100"
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-red-600 transition-colors"
+                          title="Remove Scan"
                         >
-                          <X className="w-4 h-4" />
+                          <X size={14} />
                         </button>
                       </div>
                     )}
+
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -382,105 +411,105 @@ const ConsultationPage: React.FC = () => {
                     />
                   </div>
                 </div>
+
               </div>
 
-              {/* Submit Button */}
-              <div className="text-center">
+              {/* Submit CTA */}
+              <div className="pt-4 flex flex-col items-center">
                 <button
                   onClick={handleSubmit}
-                  disabled={isLoading || (!audioBlob && !selectedImage && !textSymptoms)} // ✅ Changed this line
-                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-lg px-12 py-4 rounded-2xl flex items-center justify-center gap-3 mx-auto transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-xl shadow-emerald-500/25 min-w-[280px]"
+                  disabled={isLoading || (!audioBlob && !selectedImage && !textSymptoms.trim())}
+                  className="w-full sm:w-auto min-w-[320px] py-4 px-8 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-sm sm:text-base rounded-2xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2.5"
                 >
                   {isLoading ? (
                     <>
-                      <Loader className="w-5 h-5 animate-spin" />
-                      <span>Analyzing with AI...</span>
+                      <Loader size={18} className="animate-spin" />
+                      <span>Synthesizing Clinical Analysis...</span>
                     </>
                   ) : (
                     <>
-                      <Stethoscope className="w-5 h-5" />
-                      <span>Get AI Medical Analysis</span>
+                      <AsklepiosCross size={18} color="#ffffff" />
+                      <span>Generate AI Diagnostic Analysis</span>
                     </>
                   )}
                 </button>
-                <p className="text-gray-600 text-sm mt-3">AI-powered medical consultation in seconds</p>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Powered by Whisper speech recognition, Llama 4 Scout vision AI, and ElevenLabs voice
+                </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-10">
-              {/* Results Header */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl mb-4 shadow-xl">
-                  <Stethoscope className="w-8 h-8 text-white" />
+            /* Results View */
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between pb-6 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <CheckCircle2 size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-950">Clinical Diagnostic Report</h2>
+                    <p className="text-xs text-slate-500">Completed by Medly AI Intelligence Node</p>
+                  </div>
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold mb-3 text-gray-900">
-                  Medical Analysis Results
-                </h2>
-                <p className="text-gray-600">AI-powered medical consultation complete</p>
+
+                <button
+                  onClick={resetConsultation}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <RotateCcw size={14} />
+                  <span>New Session</span>
+                </button>
               </div>
-              
-              {/* Transcription */}
+
+              {/* Patient Symptom Transcript */}
               {result.transcription && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 hover:bg-gray-50 transition-all duration-300 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <Mic className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Your Symptoms</h3>
-                      <p className="text-gray-600 text-sm">Transcribed from audio</p>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-6">
-                    <p className="text-gray-800 italic text-lg leading-relaxed font-medium">{result.transcription}</p>
-                  </div>
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                    Patient Input & Transcription
+                  </span>
+                  <p className="text-xs sm:text-sm text-slate-800 italic leading-relaxed">
+                    "{result.transcription}"
+                  </p>
                 </div>
               )}
 
-              {/* AI Analysis */}
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-2 border-emerald-300 rounded-2xl p-6 sm:p-8 shadow-xl">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                    <Stethoscope className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">AI Doctor Analysis</h3>
-                    <p className="text-gray-600 text-sm">Professional medical assessment</p>
-                  </div>
+              {/* Primary AI Doctor Analysis */}
+              <div className="p-6 sm:p-8 rounded-3xl bg-blue-50/60 border border-blue-200/80">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                    Clinical Differential Assessment
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                    Diagnostic Analysis Complete
+                  </span>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-6">
-                  <p className="text-lg leading-relaxed text-gray-800 font-medium">{result.analysis}</p>
+
+                <div className="text-slate-900 text-sm sm:text-base leading-relaxed whitespace-pre-line font-normal">
+                  {result.analysis?.replace(/\*\*/g, '').replace(/\*/g, '')}
                 </div>
               </div>
 
-              {/* Audio Response */}
+              {/* AI Doctor Spoken Audio Playback */}
               {result.audio_url && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 text-center hover:bg-gray-50 transition-all duration-300 shadow-sm">
-                  <div className="flex items-center justify-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <Play className="w-6 h-6 text-white" />
+                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                      <Volume2 size={20} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">Audio Response</h3>
-                      <p className="text-gray-600 text-sm">Listen to the diagnosis</p>
+                      <h4 className="text-sm font-bold text-slate-900">Spoken Doctor Response</h4>
+                      <p className="text-xs text-slate-500">Audio playback of clinical insights</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={playAudio} 
-                    className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-8 py-4 rounded-xl flex items-center gap-3 mx-auto transition-all duration-300 transform hover:scale-105 shadow-xl shadow-emerald-500/25"
+
+                  <button
+                    onClick={playAudio}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs flex items-center gap-2 shadow-sm transition-all"
                   >
-                    {isPlayingAudio ? (
-                      <>
-                        <Pause className="w-5 h-5" />
-                        <span>Pause Audio</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-5 h-5" />
-                        <span>Play Audio Response</span>
-                      </>
-                    )}
+                    {isPlayingAudio ? <Pause size={14} /> : <Play size={14} />}
+                    <span>{isPlayingAudio ? 'Pause Response' : 'Listen to Diagnosis'}</span>
                   </button>
+
                   <audio
                     ref={audioRef}
                     src={`${API_BASE_URL}${result.audio_url}`}
@@ -490,45 +519,38 @@ const ConsultationPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <button 
-                  onClick={resetConsultation} 
-                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl shadow-emerald-500/25 min-w-[200px]"
+              {/* Next Steps Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                <button
+                  onClick={resetConsultation}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-sm shadow-md shadow-blue-500/20 transition-all"
                 >
-                  New Consultation
+                  Start Another Consultation
                 </button>
-                <Link 
-                  to="/dashboard" 
-                  className="bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg min-w-[200px] text-center"
+                <Link
+                  to="/dashboard"
+                  className="w-full sm:w-auto px-8 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl font-semibold text-sm text-center transition-colors"
                 >
-                  Back to Dashboard
+                  Return to Dashboard
                 </Link>
               </div>
 
-              {/* Enhanced Disclaimer */}
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-yellow-600 text-lg">⚠️</span>
-                  </div>
-                  <div>
-                    <h4 className="text-yellow-800 font-semibold text-lg mb-2">Important Medical Disclaimer</h4>
-                    <p className="text-yellow-700 leading-relaxed">
-                      This AI analysis is for <strong className="text-yellow-800">educational and informational purposes only</strong>. 
-                      It should not replace professional medical advice, diagnosis, or treatment. Always consult with a 
-                      licensed healthcare provider for any medical concerns or before making treatment decisions.
-                    </p>
-                  </div>
-                </div>
+              {/* Clinical Notice Box */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 leading-relaxed flex items-start gap-2.5">
+                <ShieldCheck size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <p>
+                  <strong>Clinical Notice:</strong> This analysis is intended for clinical education and triage support. For emergency symptoms such as chest compression or stroke signs, please seek immediate emergency care.
+                </p>
               </div>
+
             </div>
           )}
-        </div>
+
+        </main>
+
       </div>
     </div>
   );
 };
 
 export default ConsultationPage;
-  

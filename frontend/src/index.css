@@ -1,205 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Enhanced medical theme styles - Modern CSS */
-
-/* Custom components */
-
-/* Custom font utility classes */
-.font-jakarta {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-.font-space {
-  font-family: 'Space Grotesk', sans-serif;
-}
-
-.font-montserrat {
-  font-family: 'Montserrat', sans-serif;
-}
-
-.font-sixtyfour {
-  font-family: 'Sixtyfour', sans-serif;
-}
-
-/* Professional medical theme utility classes */
-.text-medical-primary {
-  color: #1f2937;
-}
-
-.text-medical-secondary {
-  color: #6b7280;
-}
-
-.bg-medical-light {
-  background-color: #f9fafb;
-}
-
-.shadow-medical {
-  box-shadow: 0 10px 25px -3px rgba(5, 150, 105, 0.1), 0 4px 6px -2px rgba(5, 150, 105, 0.05);
-}
-
-
-@layer components {
-  .btn-medical {
-    @apply font-semibold px-6 py-3 rounded-lg transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2;
-  }
-  
-  .btn-primary-medical {
-    @apply bg-green-400 hover:bg-green-500 text-gray-900;
-  }
-  
-  .btn-secondary-medical {
-    @apply bg-transparent border-2 border-white/30 hover:bg-white/10 hover:border-white/50 text-white;
-  }
-  
-  .glass-card {
-    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl;
-  }
-  
-  .text-gradient {
-    @apply bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent;
-  }
-}
-
-/* Reset and base styles */
+/* Reset and smooth base */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: 'Plus Jakarta Sans', 'Space Grotesk', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
-  background: #ffffff;
-  color: #1f2937;
+  background-color: #f1f5f9;
+  color: #0f172a;
   min-height: 100vh;
+  letter-spacing: -0.01em;
 }
 
-/* Glass morphism effect */
-.glass-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1rem;
+/* Glass & Card Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-/* Button styles */
-.btn-medical {
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  text-decoration: none;
-  display: inline-block;
-  border: none;
-  cursor: pointer;
-  font-size: inherit;
+.glass-pill {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.7);
 }
 
-.btn-medical:hover {
-  transform: translateY(-2px);
+.card-canvas {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.06), 0 0 1px 1px rgba(15, 23, 42, 0.02);
 }
 
-.btn-primary-medical {
-  background-color: #4ade80;
-  color: #1f2937;
+.brand-glow {
+  box-shadow: 0 10px 30px -5px rgba(0, 98, 255, 0.35);
 }
 
-.btn-primary-medical:hover {
-  background-color: #22c55e;
+.brand-glow-subtle {
+  box-shadow: 0 4px 20px -2px rgba(0, 98, 255, 0.15);
 }
 
-.btn-secondary-medical {
-  background-color: transparent;
-  color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+/* Shimmer & Ribbons */
+.ribbon-gradient-mask {
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 
-.btn-secondary-medical:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-/* Text gradient effect */
-.text-gradient {
-  background: linear-gradient(to right, #4ade80, #60a5fa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
 
-/* Animation effects */
-.animate-float {
-  animation: float 6s ease-in-out infinite;
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 
-.animate-float-delayed {
-  animation: float 6s ease-in-out infinite 2s;
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
-.animate-float-delayed-2 {
-  animation: float 6s ease-in-out infinite 4s;
-}
-
-@keyframes float {
-  0%, 100% { 
-    transform: translateY(0px); 
+/* Subtle animation helpers */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
   }
-  50% { 
-    transform: translateY(-20px); 
+  50% {
+    transform: translateY(-8px) scale(1.01);
   }
 }
 
-/* Loading animation */
-.animate-spin {
-  animation: spin 1s linear infinite;
+.animate-float-slow {
+  animation: floatSlow 7s ease-in-out infinite;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Pulse animation */
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
+@keyframes pulseSubtle {
   0%, 100% {
     opacity: 1;
   }
   50% {
-    opacity: .5;
+    opacity: 0.75;
   }
 }
 
-/* Custom Font Utility Classes */
-.font-jakarta {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-.font-space {
-  font-family: 'Space Grotesk', sans-serif;
-}
-
-.font-montserrat {
-  font-family: 'Montserrat', sans-serif;
-}
-
-.font-sixtyfour {
-  font-family: 'Sixtyfour', sans-serif;
+.animate-pulse-subtle {
+  animation: pulseSubtle 3s ease-in-out infinite;
 }

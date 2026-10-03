@@ -8,6 +8,7 @@
 # API Keys and Secrets
 *.key
 secrets/
+RENDER_ENV_VARIABLES.txt
 
 # Python
 __pycache__/
@@ -34,6 +35,8 @@ MANIFEST
 
 # Virtual Environments
 .venv/
+.venv
+backend/.venv
 venv/
 ENV/
 env/

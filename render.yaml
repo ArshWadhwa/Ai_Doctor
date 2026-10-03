@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: ai-medical-doctor-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.6
+      - key: PIP_VERSION
+        value: 23.3.1
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+    healthCheckPath: /health
+  
+  - type: static
+    name: ai-medical-doctor-frontend
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 18.18.0
+      - key: REACT_APP_SUPABASE_URL
+        sync: false
+      - key: REACT_APP_SUPABASE_ANON_KEY
+        sync: false
+      - key: REACT_APP_BACKEND_URL
+        value: https://ai-medical-doctor-backend.onrender.com

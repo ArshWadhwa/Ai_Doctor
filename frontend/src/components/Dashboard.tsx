@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { AsklepiosCross, ActionPlusButton } from './BrandElements';
 import { 
   User, 
   LogOut, 
@@ -9,12 +10,14 @@ import {
   History, 
   Calendar, 
   FileText,
-  Stethoscope,
   Activity,
   Clock,
-  CheckCircle,
+  CheckCircle2,
   AlertCircle,
-  Brain
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
 import { 
   consultationService, 
@@ -45,7 +48,6 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch real data from Supabase
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user?.id) {
@@ -61,9 +63,7 @@ const Dashboard: React.FC = () => {
         const { data: profile, error: profileError } = await profileService.getProfile(user.id);
         if (profileError) {
           console.error('Error fetching profile:', profileError);
-          // If profile doesn't exist, create one
           if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows')) {
-            console.log('Profile not found, creating new profile...');
             const { data: newProfile, error: createError } = await profileService.upsertProfile({
               id: user.id,
               email: user.email || '',
@@ -71,9 +71,7 @@ const Dashboard: React.FC = () => {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
-            if (createError) {
-              console.error('Error creating profile:', createError);
-            } else {
+            if (!createError) {
               setUserProfile(newProfile);
             }
           }
@@ -82,32 +80,27 @@ const Dashboard: React.FC = () => {
         }
 
         // Fetch recent consultations
-        const { data: consultationsData, error: consultationsError } = await consultationService.getConsultations(user.id, 5);
+        const { data: consultationsData, error: consultationsError } = await consultationService.getConsultations(user.id, 6);
         if (consultationsError) {
-          console.error('Error fetching consultations:', consultationsError);
           setError('Failed to load consultations');
         } else {
           setConsultations(consultationsData || []);
         }
 
-        // Fetch consultation stats
+        // Fetch stats
         const stats = await consultationService.getConsultationStats(user.id);
-        if (stats.error) {
-          console.error('Error fetching stats:', stats.error);
-        } else {
-          setDashboardStats({
+        if (!stats.error) {
+          setDashboardStats(prev => ({
+            ...prev,
             totalConsultations: stats.total,
             monthlyConsultations: stats.thisMonth,
             completedConsultations: stats.completed,
-            healthInsights: 0 // Will be updated with health metrics
-          });
+          }));
         }
 
         // Fetch health insights
         const { commonSymptoms, error: healthError } = await healthMetricsService.getHealthInsights(user.id);
-        if (healthError) {
-          console.error('Error fetching health insights:', healthError);
-        } else {
+        if (!healthError) {
           setDashboardStats(prev => ({
             ...prev,
             healthInsights: commonSymptoms.length
@@ -129,287 +122,307 @@ const Dashboard: React.FC = () => {
     navigate('/');
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'voice': return <Mic className="w-4 h-4" />;
-      case 'image': return <Upload className="w-4 h-4" />;
-      case 'combined': return <FileText className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
-    }
+  const getDisplayName = () => {
+    return userProfile?.full_name || 
+           user?.user_metadata?.full_name || 
+           user?.email?.split('@')[0] || 
+           'User';
   };
 
-  const getDisplayName = () => {
-  return userProfile?.full_name || 
-         user?.user_metadata?.full_name || 
-         user?.email?.split('@')[0] || 
-         'User';
-};
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="w-4 h-4 text-medical-green" />;
-      case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'cancelled': return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default: return <Clock className="w-4 h-4" />;
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'voice': return <Mic className="w-4 h-4 text-blue-600" />;
+      case 'image': return <Upload className="w-4 h-4 text-sky-600" />;
+      case 'combined': return <FileText className="w-4 h-4 text-indigo-600" />;
+      default: return <FileText className="w-4 h-4 text-blue-600" />;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-          >
-            Try Again
-          </button>
+      <div className="min-h-screen bg-[#edf2f7] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 text-center max-w-sm w-full">
+          <div className="w-12 h-12 border-3 border-blue-500/20 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-slate-800">Synchronizing Clinical Profile...</p>
+          <p className="text-xs text-slate-500 mt-1">Loading your Medly intelligence dashboard</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - Autofy Style Navigation */}
-      <header className="sticky top-0 z-50 py-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between h-16 px-6">
-              {/* Left - Logo/Brand */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">AI Doctor</span>
-              </div>
-
-              {/* Center - Navigation Links */}
-              <nav className="hidden md:flex items-center gap-8">
-                <Link 
-                  to="/dashboard" 
-                  className="text-emerald-600 font-semibold text-sm relative pb-1"
-                >
-                  Dashboard
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 rounded-full"></span>
-                </Link>
-                <Link 
-                  to="/consultation" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  Consultation
-                </Link>
-                <Link 
-                  to="/health-insights" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  Insights
-                </Link>
-                <Link 
-                  to="/consultation-history" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  History
-                </Link>
-                <Link 
-                  to="/profile" 
-                  className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm"
-                >
-                  Profile
-                </Link>
-              </nav>
-
-              {/* Right - User Menu & Actions */}
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
-                  <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">{getDisplayName()}</span>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-                <Link
-                  to="/consultation"
-                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all"
-                >
-                  New Consultation
-                </Link>
-              </div>
+    <div className="min-h-screen bg-[#edf2f7] py-4 sm:py-6 px-2 sm:px-6 lg:px-8 antialiased text-slate-900 flex flex-col items-center">
+      <div className="w-full max-w-[1400px] flex flex-col gap-6">
+        
+        {/* Navigation Bar */}
+        <header className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm px-6 sm:px-8 py-4 flex items-center justify-between">
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-3 group focus:outline-none">
+            <div className="w-9 h-9 flex items-center justify-center text-slate-900 group-hover:rotate-90 transition-transform">
+              <AsklepiosCross size={24} />
             </div>
-          </div>
-        </div>
-      </header>
+            <span className="font-bold text-xl tracking-tight text-slate-900">
+              Medly
+            </span>
+          </Link>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {getDisplayName()}!
-          </h1>
-          <p className="text-gray-600">
-            Track your consultations, manage your health records, and get AI-powered medical insights.
-          </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-emerald-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalConsultations}</p>
-                <p className="text-gray-600 text-sm">Total Consultations</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{dashboardStats.monthlyConsultations}</p>
-                <p className="text-gray-600 text-sm">This Month</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{dashboardStats.completedConsultations}</p>
-                <p className="text-gray-600 text-sm">Completed</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Link
-              to="/consultation"
-              className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:scale-105"
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center gap-7">
+            <Link 
+              to="/dashboard" 
+              className="text-sm font-semibold text-blue-600 relative py-1"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                  <Mic className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Start Consultation</h3>
-                  <p className="text-white/80 text-sm">Record symptoms & get AI analysis</p>
-                </div>
-              </div>
+              Dashboard
+              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
             </Link>
-
+            <Link 
+              to="/consultation" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              New Consultation
+            </Link>
+            <Link 
+              to="/health-insights" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Health Insights
+            </Link>
             <Link 
               to="/consultation-history" 
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all duration-300"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <History className="w-6 h-6 text-gray-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900">View History</h3>
-                  <p className="text-gray-600 text-sm">Browse past consultations</p>
-                </div>
-              </div>
+              History
             </Link>
+            <Link 
+              to="/profile" 
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Profile
+            </Link>
+          </nav>
 
+          {/* User & Actions */}
+          <div className="flex items-center gap-3">
             <Link
-              to="/health-insights"
-              className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300"
+              to="/profile"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/70 transition-colors"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <Activity className="w-6 h-6 text-purple-600" />
+              <div className="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">
+                {getDisplayName().charAt(0).toUpperCase()}
+              </div>
+              <span className="hidden sm:inline text-xs font-semibold text-slate-800 max-w-[120px] truncate">
+                {getDisplayName()}
+              </span>
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+              title="Log out"
+            >
+              <LogOut size={18} />
+            </button>
+
+            <ActionPlusButton to="/consultation" size="sm" title="Start Consultation" />
+          </div>
+        </header>
+
+        {/* Welcome Section */}
+        <section className="w-full bg-white rounded-3xl border border-slate-200/80 shadow-md p-6 sm:p-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-radial from-blue-100/40 via-sky-50/20 to-transparent -mr-20 -mt-20 pointer-events-none rounded-full" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  AI Medical Assistant Ready
+                </span>
+                <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                  <ShieldCheck size={14} className="text-blue-600" /> Private & Secure
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-950 tracking-tight">
+                Welcome back, {getDisplayName()}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-xl leading-relaxed">
+                Your personal health dashboard. Record voice symptoms, upload medical images, or review your past consultation records and insights.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Link
+                to="/consultation"
+                className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-xs sm:text-sm shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
+              >
+                <span>Start Consultation</span>
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+
+          {/* Metric Badges */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-100">
+            {[
+              { label: 'Total Consultations', value: dashboardStats.totalConsultations, icon: FileText, color: 'text-blue-600 bg-blue-50' },
+              { label: 'This Month', value: dashboardStats.monthlyConsultations, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
+              { label: 'Completed Diagnoses', value: dashboardStats.completedConsultations, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Tracked Health Insights', value: dashboardStats.healthInsights, icon: Activity, color: 'text-indigo-600 bg-indigo-50' }
+            ].map((stat, idx) => (
+              <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center gap-3.5">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.color}`}>
+                  <stat.icon size={20} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-gray-900">Health Insights</h3>
-                  <p className="text-gray-600 text-sm">AI-powered health analysis</p>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* Recent Consultations */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Consultations</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {consultations.map((consultation) => (
-              <div key={consultation.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    {getTypeIcon(consultation.consultation_type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {new Date(consultation.created_at).toLocaleDateString()}
-                      </p>
-                      {getStatusIcon(consultation.status)}
-                    </div>
-                    <p className="text-gray-600 text-sm leading-relaxed line-clamp-2">
-                      {consultation.analysis || consultation.transcription || `${consultation.consultation_type} consultation`}
-                    </p>
-                  </div>
-                  <button className="text-emerald-600 hover:text-emerald-700 transition-colors text-sm font-medium">
-                    View Details
-                  </button>
+                  <p className="text-xl font-bold text-slate-900 font-mono leading-none">{stat.value}</p>
+                  <p className="text-[11px] text-slate-500 font-medium mt-1">{stat.label}</p>
                 </div>
               </div>
             ))}
           </div>
-          {consultations.length === 0 && (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-gray-400" />
+        </section>
+
+        {/* Quick Launch Cards */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Link
+            to="/consultation"
+            className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col justify-between group"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                <Mic size={22} />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No consultations yet</h3>
-              <p className="text-gray-600 mb-4">Start your first consultation to see your health journey here.</p>
-              <Link
-                to="/consultation"
-                className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                Start Consultation
-              </Link>
+              <h3 className="text-base font-bold text-slate-900 mb-1">Voice Consultation</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Describe symptoms naturally using your microphone with real-time Whisper transcription.
+              </p>
             </div>
-          )}
-        </div>
-      </main>
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs font-semibold text-blue-600">
+              <span>Launch Mic</span>
+              <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          <Link
+            to="/consultation"
+            className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col justify-between group"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                <Upload size={22} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 mb-1">Upload Medical Scans</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Drop X-rays, MRI slices, or dermatological photographs for automated computer vision detection.
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs font-semibold text-sky-600">
+              <span>Scan Analyzer</span>
+              <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          <Link
+            to="/health-insights"
+            className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col justify-between group"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                <Activity size={22} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 mb-1">Health Graph & ICD-10</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                View longitudinal trend analysis, recurrent symptoms, and personalized wellness recommendations.
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs font-semibold text-indigo-600">
+              <span>View Insights</span>
+              <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+        </section>
+
+        {/* Recent Consultations List */}
+        <section className="bg-white rounded-3xl border border-slate-200/80 shadow-md p-6 sm:p-8">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Recent Consultations</h2>
+              <p className="text-xs text-slate-500">Your latest diagnostic sessions and reports</p>
+            </div>
+            <Link
+              to="/consultation-history"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <span>View All</span>
+              <ChevronRight size={14} />
+            </Link>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {consultations.map((consultation) => (
+              <div key={consultation.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/70 p-2 rounded-2xl transition-colors">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {getTypeIcon(consultation.consultation_type)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-slate-900">
+                        {new Date(consultation.created_at).toLocaleDateString(undefined, { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono capitalize">
+                        {consultation.consultation_type}
+                      </span>
+                      {consultation.status === 'completed' ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">
+                          {consultation.status}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 max-w-2xl leading-relaxed">
+                      {(consultation.analysis || consultation.transcription || 'Consultation session')?.replace(/\*\*/g, '').replace(/\*/g, '')}
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  to="/consultation-history"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 w-max self-end sm:self-center transition-colors"
+                >
+                  Review Diagnosis →
+                </Link>
+              </div>
+            ))}
+
+            {consultations.length === 0 && (
+              <div className="py-12 text-center">
+                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <FileText size={24} />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">No consultations on file yet</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                  Start your first voice or scan session to populate your personal diagnostic log.
+                </p>
+                <Link
+                  to="/consultation"
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm"
+                >
+                  <Mic size={14} />
+                  <span>Start First Consultation</span>
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+
+      </div>
     </div>
   );
 };

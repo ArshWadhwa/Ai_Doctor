@@ -1,424 +1,736 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Stethoscope, Brain, Mic, Image, Clock, Menu, X } from 'lucide-react';
+import { 
+  AsklepiosCross, 
+  ActionPlusButton 
+} from './BrandElements';
+import { 
+  Mic, 
+  Upload, 
+  Activity, 
+  ShieldCheck, 
+  Sparkles, 
+  ArrowRight, 
+  CheckCircle2, 
+  ChevronRight, 
+  X, 
+  Menu,
+  Stethoscope,
+  Volume2,
+  Clock,
+  History,
+  Send,
+  AlertTriangle
+} from 'lucide-react';
 
 const LandingPage: React.FC = () => {
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'voice' | 'vision' | 'insights'>('voice');
+  const [isWaveActive, setIsWaveActive] = useState(true);
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickSymptom, setQuickSymptom] = useState('');
+
+  const navLinks = [
+    { name: 'Homepage', href: '#home', active: true },
+    { name: 'Features', href: '#features' },
+    { name: 'How It Works', href: '#how-it-works' },
+    { name: 'Clinical Preview', href: '#diagnostics' },
+    { name: 'Safety', href: '#safety' },
+  ];
+
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      const id = href.substring(1);
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Enhanced Navigation Bar - Autofy Style */}
-      <nav className="fixed top-0 w-full z-50 py-4 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between h-16 px-6">
-              {/* Logo/Brand */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">AI Doctor</span>
-              </div>
+    <div className="min-h-screen bg-[#edf2f7] py-3 sm:py-6 px-2 sm:px-6 lg:px-8 flex flex-col items-center justify-start antialiased text-slate-900">
+      {/* Outer Floating Viewport Canvas */}
+      <main className="w-full max-w-[1440px] bg-white rounded-[28px] sm:rounded-[42px] border border-slate-200/80 shadow-2xl relative overflow-hidden flex flex-col">
+        
+        {/* Navigation Bar */}
+        <header className="w-full px-6 sm:px-12 py-5 sm:py-7 flex items-center justify-between z-30 relative border-b border-slate-100/80 bg-white/90 backdrop-blur-md">
+          {/* Brand Logo & Name */}
+          <Link to="/" className="flex items-center gap-3 group focus:outline-none" aria-label="Medly Home">
+            <div className="w-10 h-10 flex items-center justify-center text-slate-900 transition-transform duration-300 group-hover:rotate-90 group-hover:text-blue-600">
+              <AsklepiosCross size={28} />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-slate-950">
+              Medly
+            </span>
+          </Link>
 
-              {/* Center Navigation - Desktop */}
-              <nav className="hidden md:flex items-center gap-8">
-                <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">Features</a>
-                <a href="#about" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">About</a>
-                <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">How It Works</a>
-                <a href="#contact" className="text-gray-600 hover:text-gray-900 font-medium transition-colors text-sm">Contact</a>
-              </nav>
+          {/* Center Navigation Links (Desktop) */}
+          <nav className="hidden md:flex items-center gap-7 lg:gap-9" aria-label="Main Navigation">
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                onClick={(e) => handleAnchorClick(e, link.href)}
+                className={`text-[14px] lg:text-[15px] font-medium transition-all relative py-1 ${
+                  link.active
+                    ? 'text-slate-950 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {link.active && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-slate-900 rounded-full" />
+                )}
+                {link.name}
+              </a>
+            ))}
+          </nav>
 
-              {/* Right - CTA Buttons */}
-              <div className="hidden md:flex items-center gap-3">
-                <Link 
-                  to="/auth" 
-                  className="text-gray-600 hover:text-emerald-600 hover:bg-gray-50 transition-colors font-medium px-4 py-2 rounded-lg text-sm"
+          {/* Right Action Menu */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <a 
+              href="#safety" 
+              onClick={(e) => handleAnchorClick(e, '#safety')}
+              className="hidden sm:inline-block text-[14px] lg:text-[15px] font-medium text-slate-700 hover:text-slate-950 transition-colors"
+            >
+              Clinical Safety
+            </a>
+
+            <Link 
+              to="/auth" 
+              className="hidden sm:inline-block text-[14px] font-semibold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Sign In
+            </Link>
+
+            <ActionPlusButton to="/auth" title="Get Started / Try For Free" />
+
+            {/* Mobile Menu Toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none"
+              aria-label="Toggle Menu"
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
+        </header>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden px-6 py-4 border-b border-slate-200 bg-white/95 backdrop-blur-md z-40">
+            <div className="flex flex-col gap-3">
+              {navLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    handleAnchorClick(e, link.href);
+                  }}
+                  className="text-base font-medium text-slate-700 hover:text-blue-600 py-1.5"
                 >
-                  Sign In
+                  {link.name}
+                </a>
+              ))}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <Link
+                  to="/auth"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-semibold text-blue-600"
+                >
+                  Sign In / Register
                 </Link>
-                <Link 
-                  to="/auth" 
-                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium text-sm shadow-md hover:shadow-lg transition-all"
+                <Link
+                  to="/consultation"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-semibold text-slate-800"
                 >
-                  Get Started
+                  Start Consultation
                 </Link>
-              </div>
-
-              {/* Mobile menu button */}
-              <div className="md:hidden">
-                <button
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="text-gray-600 hover:text-emerald-600 p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Mobile Navigation */}
-            {isMenuOpen && (
-              <div className="md:hidden border-t border-gray-200">
-                <div className="px-4 py-3 space-y-1">
-                  <a href="#features" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Features</a>
-                  <a href="#about" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">About</a>
-                  <a href="#how-it-works" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">How It Works</a>
-                  <a href="#contact" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Contact</a>
-                  <div className="pt-3 pb-2 border-t border-gray-200 mt-3">
-                    <Link to="/auth" className="block text-gray-600 hover:text-emerald-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">Sign In</Link>
-                    <Link to="/auth" className="block bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 py-2 rounded-lg font-medium mt-2 text-center text-sm">Get Started</Link>
+        {/* HERO SECTION WITH BACKGROUND VIDEO & HIGH-END OVERLAYS */}
+        <section id="home" className="relative w-full min-h-[620px] sm:min-h-[700px] lg:min-h-[740px] flex flex-col justify-end p-6 sm:p-12 lg:p-16 overflow-hidden">
+          
+          {/* Background Video Container */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden select-none z-0">
+            <video 
+              autoPlay 
+              loop 
+              muted 
+              playsInline 
+              preload="auto"
+              className="w-full h-full object-cover object-center scale-[1.02] transition-opacity duration-1000"
+            >
+              <source src="/generate_video_od_this_its_m.mp4" type="video/mp4" />
+            </video>
+
+            {/* Subtle Gradient Overlays for High Contrast */}
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/30 to-white/10 z-[1]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-white/80 via-white/20 to-transparent z-[1]" />
+            <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white to-transparent z-[2]" />
+          </div>
+
+          {/* Hero Content Grid - Elegantly Placed on Top */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end relative z-10 w-full pb-2">
+            
+            {/* Left Headline & Clean Description */}
+            <div className="lg:col-span-8 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/90 backdrop-blur-md text-blue-700 border border-blue-200/80 shadow-sm mb-4">
+                <Sparkles size={13} />
+                <span>AI-Powered Medical Consultation</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-[60px] font-bold text-slate-950 tracking-tight leading-[1.06] mb-4 drop-shadow-[0_2px_10px_rgba(255,255,255,0.8)]">
+                Introducing Medly <br />
+                <span className="text-slate-900 font-extrabold">Personalized Health AI</span>
+              </h1>
+
+              <p className="text-base sm:text-lg text-slate-700 font-normal leading-relaxed max-w-xl bg-white/70 backdrop-blur-md p-3 rounded-2xl border border-white/60">
+                Get instant medical insights by describing your symptoms with your voice, typing your concerns, or uploading medical photos. Medly generates structured differential assessments, suggests ICD-10 codes, and plays back doctor audio guidance.
+              </p>
+            </div>
+
+            {/* Right "Try For Free" Floating Glass Card */}
+            <div className="lg:col-span-4 flex justify-start lg:justify-end">
+              <div className="w-full max-w-[350px] bg-white/85 backdrop-blur-xl border border-white/80 rounded-3xl p-6 sm:p-7 shadow-2xl hover:shadow-blue-500/10 transition-all relative flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold text-slate-950">
+                      Try For Free
+                    </span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                      Instant Triage
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                    Describe any symptom or attach an image to receive immediate medical insights and ICD-10 classification.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {['Chest discomfort', 'Persistent cough', 'Skin rash'].map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          setQuickSymptom(tag);
+                          setShowQuickModal(true);
+                        }}
+                        className="text-xs bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-lg border border-slate-200/80 transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-            {/* Hero Content */}
-            <div className="flex-1 text-center lg:text-left">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight mb-6 text-gray-900">
-                Your Health <br />
-                <span className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 bg-clip-text text-transparent">
-                  Our Care
-                </span>
-              </h1>
-              <p className="text-lg sm:text-xl text-gray-600 mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                Get instant medical analysis with our cutting-edge AI technology. 
-                Upload medical images, record your symptoms, and receive professional 
-                diagnostic insights with ICD-10 codes.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link 
-                  to="/auth" 
-                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-8 py-4 rounded-xl font-semibold shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 text-center"
-                >
-                  Start Free Consultation
-                </Link>
-                <a 
-                  href="#features" 
-                  className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 px-8 py-4 rounded-xl font-semibold transition-all duration-300 text-center"
-                >
-                  Learn More
-                </a>
-              </div>
-            </div>
-
-            {/* Hero Visual */}
-            <div className="flex-1 flex justify-center lg:justify-end">
-              <div className="relative w-80 h-80 sm:w-96 sm:h-96">
-                <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-                  <video 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline
-                    className="w-full h-full object-cover"
+                <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-200/60">
+                  <Link 
+                    to="/auth" 
+                    className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
                   >
-                    <source src="/Animated_Video_Generation_From_Image.mp4" type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                  <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 to-transparent pointer-events-none"></div>
-                </div>
-                
-                {/* Floating medical icons */}
-                <div className="absolute -top-4 -right-4 w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                  <Stethoscope className="w-8 h-8 text-emerald-600" />
-                </div>
-                <div className="absolute -bottom-4 -left-4 w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                  <Brain className="w-7 h-7 text-blue-600" />
+                    Launch Consultation <ChevronRight size={14} />
+                  </Link>
+
+                  <button 
+                    onClick={() => setShowQuickModal(true)}
+                    className="w-10 h-10 bg-slate-900 hover:bg-blue-600 active:scale-95 text-white rounded-2xl flex items-center justify-center transition-all shadow-md"
+                    title="Quick Check"
+                  >
+                    <span className="text-xl font-medium leading-none">+</span>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* AI Medical Illustration Section */}
-      <section id="how-it-works" className="py-12 lg:py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 lg:mb-12">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Advanced AI-Powered Medical Consultation
+        {/* SECTION 2: Interactive Diagnostic Engine Preview */}
+        <section id="diagnostics" className="w-full px-6 sm:px-12 lg:px-16 py-16 sm:py-20 bg-slate-50/60 border-t border-slate-100">
+          <div className="max-w-3xl mb-12">
+            <span className="text-xs sm:text-sm font-bold tracking-wider text-blue-600 uppercase mb-2 block">
+              Multi-Modal Health Consultation
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-950 tracking-tight">
+              Real-time diagnosis across voice, scans, and clinical symptoms.
             </h2>
-            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
-              Experience seamless medical analysis with voice recording, AI diagnosis, and comprehensive reporting
+            <p className="text-base text-slate-600 mt-3">
+              Experience how Medly translates spoken symptoms and uploaded images into structured medical insights and spoken doctor responses.
             </p>
           </div>
-          
-          <div className="flex justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" className="w-full max-w-5xl h-auto" role="img" aria-label="AI Medical Doctor illustration">
-              <defs>
-                {/* Green gradients */}
-                <linearGradient id="gradA" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#22c55e"/>
-                  <stop offset="1" stopColor="#16a34a"/>
-                </linearGradient>
 
-                <linearGradient id="gradB" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#86efac" stopOpacity="0.9"/>
-                  <stop offset="1" stopColor="#bbf7d0" stopOpacity="0.9"/>
-                </linearGradient>
+          {/* Interactive Showcase Tabs */}
+          <div className="w-full bg-white rounded-3xl border border-slate-200/80 shadow-md p-6 sm:p-8 lg:p-10">
+            {/* Tab Headers */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 pb-6 border-b border-slate-100">
+              <button
+                onClick={() => setActiveTab('voice')}
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                  activeTab === 'voice'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                }`}
+              >
+                <Mic size={16} />
+                Voice Consultation & Audio Response
+              </button>
 
-                {/* Glass effect */}
-                <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#ffffff" stopOpacity="0.8"/>
-                  <stop offset="1" stopColor="#ffffff" stopOpacity="0.4"/>
-                </linearGradient>
+              <button
+                onClick={() => setActiveTab('vision')}
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                  activeTab === 'vision'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                }`}
+              >
+                <Upload size={16} />
+                Medical Image & Scan Analysis
+              </button>
 
-                <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="18" floodColor="#22c55e" floodOpacity="0.2"/>
-                </filter>
+              <button
+                onClick={() => setActiveTab('insights')}
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                  activeTab === 'insights'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                }`}
+              >
+                <Activity size={16} />
+                Health Insights & ICD-10 Codes
+              </button>
+            </div>
 
-                <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="12" result="b"/>
-                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
+            {/* Tab Content Display */}
+            <div className="mt-8">
+              {activeTab === 'voice' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  {/* Left: Animated Audio Input */}
+                  <div className="lg:col-span-6 bg-slate-50 rounded-2xl p-6 border border-slate-200/70">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
+                        <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                          Voice Signal Processing
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-slate-500">00:08 / 00:30</span>
+                    </div>
 
-                <symbol id="icon-cross" viewBox="0 0 24 24">
-                  <path d="M13 11h6v2h-6v6h-2v-6H5v-2h6V5h2z" fill="#22c55e"/>
-                </symbol>
+                    {/* Animated Sound Waveform */}
+                    <div className="h-24 bg-white rounded-xl border border-slate-200/60 p-4 flex items-center justify-center gap-1.5">
+                      {[32, 64, 45, 85, 95, 70, 40, 60, 90, 100, 75, 45, 80, 65, 30, 85, 92, 50, 35, 70, 90, 60, 40].map((h, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 bg-blue-500 rounded-full transition-all duration-300"
+                          style={{
+                            height: isWaveActive ? `${Math.min(h, 75)}%` : '20%',
+                            opacity: isWaveActive ? 0.7 + (i % 3) * 0.1 : 0.4
+                          }}
+                        />
+                      ))}
+                    </div>
 
-                {/* Subtle panel background */}
-                <linearGradient id="xrayGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#f0fdf4"/>
-                  <stop offset="1" stopColor="#dcfce7"/>
-                </linearGradient>
-              </defs>
+                    {/* Speech to text transcript */}
+                    <div className="mt-4 p-3.5 bg-white rounded-xl border border-slate-200/60">
+                      <p className="text-xs text-slate-400 font-medium mb-1">Transcribed Patient Speech:</p>
+                      <p className="text-sm text-slate-800 italic">
+                        "I've experienced a persistent dry cough and chest tightness for the past 3 days, especially worse at night."
+                      </p>
+                    </div>
 
-              {/* Background */}
-              <rect width="1200" height="600" fill="#ffffff"/>
+                    <div className="mt-4 flex items-center justify-between">
+                      <button
+                        onClick={() => setIsWaveActive(!isWaveActive)}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                      >
+                        <Volume2 size={14} />
+                        {isWaveActive ? 'Pause Waveform Preview' : 'Play Waveform Preview'}
+                      </button>
+                      <span className="text-xs text-slate-500">Spoken Audio Playback</span>
+                    </div>
+                  </div>
 
-              {/* Left: Waveform + microphone */}
-              <g transform="translate(60,120)">
-                <g transform="translate(0,0)" filter="url(#softShadow)">
-                  <rect x="18" y="0" width="120" height="170" rx="36" fill="url(#glass)" stroke="#22c55e" strokeOpacity="0.3"/>
-                  <rect x="54" y="18" width="36" height="80" rx="12" fill="#22c55e" opacity="0.1"/>
-                  <rect x="44" y="110" width="64" height="18" rx="9" fill="#22c55e" opacity="0.15"/>
-                  <path d="M60 142 q20 12 40 0" stroke="#22c55e" strokeOpacity="0.3" strokeWidth="6" fill="none" strokeLinecap="round"/>
-                  <circle cx="78" cy="42" r="6" fill="#22c55e" opacity="0.2"/>
-                </g>
+                  {/* Right: Structured Clinical Analysis */}
+                  <div className="lg:col-span-6 flex flex-col gap-4">
+                    <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                          Differential Assessment
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                          Clinical Match
+                        </span>
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900 mb-1">
+                        Acute Bronchitis / Tracheobronchial Irritation
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        Symptoms indicate lower airway mucosal irritation. Monitor for fever progression, wheezing, or respiratory fatigue.
+                      </p>
+                    </div>
 
-                {/* Waveform - Fixed width to prevent overflow */}
-                <g transform="translate(160,36)">
-                  <rect x="0" y="60" width="140" height="8" rx="4" fill="#22c55e" opacity="0.1"/>
-                  <g fill="#22c55e" opacity="0.9">
-                    <rect x="12" y="40" width="6" height="36" rx="3">
-                      <animate attributeName="height" values="24;56;24" dur="2.6s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="48;24;48" dur="2.6s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="28" y="28" width="6" height="56" rx="3">
-                      <animate attributeName="height" values="36;72;36" dur="3s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="48;24;48" dur="3s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="44" y="46" width="6" height="38" rx="3">
-                      <animate attributeName="height" values="20;48;20" dur="2s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="56;36;56" dur="2s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="60" y="22" width="6" height="68" rx="3">
-                      <animate attributeName="height" values="28;72;28" dur="3.4s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="56;24;56" dur="3.4s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="76" y="34" width="6" height="44" rx="3">
-                      <animate attributeName="height" values="32;60;32" dur="2.8s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="48;28;48" dur="2.8s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="92" y="42" width="6" height="28" rx="3">
-                      <animate attributeName="height" values="16;40;16" dur="2.2s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="52;36;52" dur="2.2s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="108" y="26" width="6" height="60" rx="3">
-                      <animate attributeName="height" values="40;72;40" dur="3.2s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="46;24;46" dur="3.2s" repeatCount="indefinite"/>
-                    </rect>
-                    <rect x="124" y="38" width="6" height="36" rx="3">
-                      <animate attributeName="height" values="24;52;24" dur="2.4s" repeatCount="indefinite"/>
-                      <animate attributeName="y" values="50;32;50" dur="2.4s" repeatCount="indefinite"/>
-                    </rect>
-                  </g>
-                </g>
-              </g>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/60">
+                        <span className="text-[11px] text-slate-400 uppercase font-semibold block mb-1">
+                          Assigned ICD-10 Code
+                        </span>
+                        <span className="text-base font-mono font-bold text-slate-900">
+                          J20.9 (Bronchitis)
+                        </span>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/60">
+                        <span className="text-[11px] text-slate-400 uppercase font-semibold block mb-1">
+                          Assessment Level
+                        </span>
+                        <span className="text-base font-semibold text-blue-700 flex items-center gap-1">
+                          <Clock size={16} /> Standard Evaluation
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Center: Glass card Doctor + AI */}
-              <g transform="translate(340,70)" filter="url(#softShadow)">
-                <rect x="0" y="0" width="440" height="460" rx="28" fill="url(#glass)" stroke="#22c55e" strokeOpacity="0.2"/>
-                <rect x="6" y="6" width="428" height="448" rx="22" fill="none" stroke="url(#gradA)" strokeWidth="1" opacity="0.08"/>
+                    <Link
+                      to="/consultation"
+                      className="mt-2 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all"
+                    >
+                      <span>Start Your Consultation</span>
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                </div>
+              )}
 
-                <g transform="translate(34,42)">
-                  <ellipse cx="100" cy="100" rx="68" ry="82" fill="#f0fdf4"/>
-                  <rect x="62" y="84" width="76" height="28" rx="8" fill="url(#gradA)" opacity="0.9"/>
-                  <path d="M76 150 q24 24 48 0" stroke="#22c55e" strokeWidth="5" fill="none" strokeLinecap="round"/>
-                  <circle cx="90" cy="152" r="6" fill="#bbf7d0"/>
-                  <circle cx="134" cy="152" r="6" fill="#bbf7d0"/>
+              {activeTab === 'vision' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  <div className="lg:col-span-6 bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden flex flex-col items-center justify-center min-h-[300px]">
+                    <div className="relative w-full max-w-sm aspect-[4/3] bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-center overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-700 opacity-90" />
+                      <div className="absolute inset-0 bg-[linear-gradient(to_right,#334155_1px,transparent_1px),linear-gradient(to_bottom,#334155_1px,transparent_1px)] bg-[size:24px_24px] opacity-20" />
+                      <div className="absolute w-36 h-28 border-2 border-cyan-400 rounded bg-cyan-400/10 flex flex-col justify-between p-2 shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+                        <span className="text-[10px] font-mono font-bold bg-cyan-400 text-slate-950 px-1 py-0.5 rounded w-max">
+                          Lesion Detected
+                        </span>
+                        <span className="text-[10px] font-mono text-cyan-200">
+                          Erythema Pattern
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-400 z-10 font-mono">Dermatological Image Preview</span>
+                    </div>
+                  </div>
 
-                  {/* Neural nodes */}
-                  <g transform="translate(24,18)">
-                    <circle cx="30" cy="25" r="5" fill="#fff" stroke="#22c55e" strokeWidth="2"/>
-                    <circle cx="70" cy="12" r="5" fill="#fff" stroke="#16a34a" strokeWidth="2"/>
-                    <circle cx="95" cy="36" r="5" fill="#fff" stroke="#86efac" strokeWidth="2"/>
-                    <circle cx="55" cy="62" r="5" fill="#fff" stroke="#bbf7d0" strokeWidth="2"/>
-                    {/* Connection lines */}
-                    <path d="M35 25 L65 12 M70 17 L90 36 M60 62 L90 36" stroke="#22c55e" strokeWidth="1" opacity="0.3"/>
-                  </g>
-                </g>
+                  <div className="lg:col-span-6 flex flex-col gap-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                      Medical Image Evaluation
+                    </span>
+                    <h3 className="text-2xl font-bold text-slate-900">
+                      Visual AI for Skin Lesions, Scans & Photos
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Upload photos of skin rashes, external swelling, eye irritation, or medical scans. Medly analyzes visible characteristics alongside your reported symptoms to suggest potential conditions.
+                    </p>
+                    <ul className="space-y-2.5 my-2">
+                      {[
+                        'Support for JPG, PNG, and camera photos directly from mobile or desktop',
+                        'Differential assessment with primary and secondary considerations',
+                        'Automatic ICD-10 medical code assignment'
+                      ].map((item, idx) => (
+                        <li key={idx} className="flex items-center gap-2.5 text-sm text-slate-700">
+                          <CheckCircle2 size={16} className="text-blue-600 flex-shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      to="/consultation"
+                      className="py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-sm w-max transition-colors"
+                    >
+                      Upload A Medical Image
+                    </Link>
+                  </div>
+                </div>
+              )}
 
-                {/* Right: X-ray panel - Fixed positioning */}
-                <g transform="translate(240,40)">
-                  <rect x="0" y="0" width="160" height="200" rx="12" fill="url(#xrayGrad)" stroke="#22c55e" strokeOpacity="0.4"/>
-                  <path d="M20 50 q25 15 50 0 q25 -15 50 0" fill="none" stroke="#22c55e" strokeOpacity="0.2" strokeWidth="6" strokeLinecap="round"/>
-                  <circle cx="80" cy="100" r="28" fill="#dcfce7" opacity="0.3"/>
-                  {/* ICD-10 code inside the panel */}
-                  <g transform="translate(26,160)">
-                    <rect x="0" y="0" width="108" height="32" rx="8" fill="#f0fdf4" stroke="#22c55e" strokeOpacity="0.2"/>
-                    <text x="12" y="22" fontFamily="Inter, Arial" fontSize="12" fill="#000">ICD-10: R07.9</text>
-                  </g>
-                </g>
+              {activeTab === 'insights' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  <div className="lg:col-span-6 flex flex-col gap-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                      Consultation Graph & Records
+                    </span>
+                    <h3 className="text-2xl font-bold text-slate-900">
+                      Track Symptoms & Trends Over Time
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Every consultation is saved to your private history. Medly identifies repeated complaints, tracks health checks over time, and highlights recurring patterns.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <span className="text-lg font-bold text-blue-600">ICD-10 Mapped</span>
+                        <span className="text-xs text-slate-500 block mt-1">Standardized Clinical Codes</span>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <span className="text-lg font-bold text-slate-900">Saved History</span>
+                        <span className="text-xs text-slate-500 block mt-1">Available in Your Dashboard</span>
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Buttons - Adjusted positioning */}
-                <g transform="translate(34,360)">
-                  <rect x="0" y="0" width="200" height="48" rx="12" fill="url(#gradA)" filter="url(#glow)"/>
-                  <text x="20" y="32" fontFamily="Inter, Arial" fontSize="14" fill="#fff" fontWeight="600">Start Consultation</text>
-
-                  <rect x="220" y="0" width="140" height="48" rx="12" fill="#f0fdf4" stroke="#22c55e" strokeOpacity="0.2"/>
-                  <text x="248" y="32" fontFamily="Inter, Arial" fontSize="14" fill="#000">Upload Image</text>
-                </g>
-              </g>
-
-              {/* Right: Analytics card - Repositioned to prevent overflow */}
-              <g transform="translate(820,120)">
-                <rect x="0" y="0" width="220" height="300" rx="20" fill="url(#glass)" stroke="#22c55e" strokeOpacity="0.2" filter="url(#softShadow)"/>
-                <g transform="translate(16,20)">
-                  <text x="0" y="18" fontFamily="Inter, Arial" fontSize="13" fill="#000">Session Insights</text>
-                  <g transform="translate(0,36)" fill="#22c55e">
-                    <rect x="0" y="28" width="16" height="32" rx="4"/>
-                    <rect x="26" y="14" width="16" height="46" rx="4"/>
-                    <rect x="52" y="6" width="16" height="54" rx="4"/>
-                    <rect x="78" y="22" width="16" height="38" rx="4"/>
-                    <rect x="104" y="16" width="16" height="44" rx="4"/>
-                    <rect x="130" y="10" width="16" height="50" rx="4"/>
-                  </g>
-                  <text x="0" y="140" fontFamily="Inter, Arial" fontSize="11" fill="#000">Top ICD-10 Codes</text>
-                  <g transform="translate(0,150)">
-                    <rect x="0" y="0" width="180" height="32" rx="6" fill="#f0fdf4"/>
-                    <text x="10" y="22" fontFamily="Inter, Arial" fontSize="11" fill="#000">R07.9 — Chest Pain</text>
-                  </g>
-                  <g transform="translate(0,190)">
-                    <rect x="0" y="0" width="180" height="32" rx="6" fill="#f0fdf4"/>
-                    <text x="10" y="22" fontFamily="Inter, Arial" fontSize="11" fill="#000">J06.9 — Upper Respiratory</text>
-                  </g>
-                  <g transform="translate(0,230)">
-                    <rect x="0" y="0" width="180" height="32" rx="6" fill="#f0fdf4"/>
-                    <text x="10" y="22" fontFamily="Inter, Arial" fontSize="11" fill="#000">M25.9 — Joint Disorder</text>
-                  </g>
-                </g>
-              </g>
-
-              {/* Decorative crosses - Repositioned to stay within bounds */}
-              <g fill="#22c55e" opacity="0.2">
-                <use href="#icon-cross" x="40" y="520" width="24" height="24"/>
-                <use href="#icon-cross" x="1050" y="40" width="24" height="24"/>
-                <use href="#icon-cross" x="180" y="80" width="20" height="20"/>
-              </g>
-
-              <desc>Illustration showing an AI-driven medical consultation in green and white: microphone with waveform, doctor card with neural nodes, X-ray panel, analytics card.</desc>
-            </svg>
+                  <div className="lg:col-span-6 bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-bold uppercase text-slate-700">Recent Session Records</span>
+                      <span className="text-xs text-blue-600 font-semibold">Consultation Log</span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { code: 'R07.9', name: 'Chest Discomfort Evaluation', level: 'High Attention', date: 'Session 1' },
+                        { code: 'J06.9', name: 'Acute Upper Respiratory (Cold)', level: 'Moderate', date: 'Session 2' },
+                        { code: 'L23.9', name: 'Contact Dermatitis / Rash', level: 'Mild', date: 'Session 3' },
+                      ].map((item, index) => (
+                        <div key={index} className="p-3 bg-white rounded-xl border border-slate-200/70 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-mono font-bold text-blue-600 mr-2">{item.code}</span>
+                            <span className="text-sm font-medium text-slate-900">{item.name}</span>
+                          </div>
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            item.level === 'High Attention' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {item.level}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-              Revolutionary Medical AI Features
+        {/* SECTION 3: Features & Capabilities */}
+        <section id="features" className="w-full px-6 sm:px-12 lg:px-16 py-16 sm:py-20 bg-white">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-xs sm:text-sm font-bold tracking-wider text-blue-600 uppercase mb-2 block">
+              Core Capabilities
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-950 tracking-tight">
+              Designed for simple, fast, and informative medical triage.
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Experience the future of medical diagnosis with our advanced AI technology
-            </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                icon: Image,
-                title: "Medical Image Analysis",
-                description: "Upload X-rays, MRIs, skin conditions, or any medical images for instant AI-powered analysis and diagnostic insights."
-              },
-              {
                 icon: Mic,
-                title: "Voice-to-Text Symptoms",
-                description: "Record your symptoms naturally. Our advanced speech recognition converts your voice to text for comprehensive analysis."
+                title: "Voice-To-Text Symptom Input",
+                desc: "Record your symptoms directly through your microphone. Your spoken words are transcribed into text automatically without typing."
               },
               {
-                icon: Brain,
-                title: "AI Doctor Responses",
-                description: "Get professional medical insights powered by advanced AI models, including differential diagnoses and ICD-10 medical codes."
+                icon: Stethoscope,
+                title: "Differential Medical Analysis",
+                desc: "Get an informative breakdown of possible causes, self-care measures, key warning signs, and relevant ICD-10 medical codes."
+              },
+              {
+                icon: Volume2,
+                title: "Doctor Audio Voice Response",
+                desc: "Listen to the consultation advice spoken out loud through natural speech synthesis, making it easy to review on any device."
+              },
+              {
+                icon: Upload,
+                title: "Medical Image Upload",
+                desc: "Attach photos of skin rashes, visual injuries, or medical documents to give the AI visual context alongside your symptoms."
+              },
+              {
+                icon: History,
+                title: "Complete Consultation History",
+                desc: "Every completed consultation, symptom transcription, and diagnostic assessment is safely saved to your personal history."
+              },
+              {
+                icon: Sparkles,
+                title: "Health History & Precautions",
+                desc: "AI cross-references your consultation records to track symptom recurrence and answer questions on what activities to avoid."
               }
-            ].map((feature, index) => (
-              <div key={index} className="bg-white backdrop-blur-sm border border-gray-200 rounded-2xl p-8 hover:bg-emerald-50 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
-                <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-6 mx-auto">
-                  <feature.icon className="w-8 h-8 text-white" />
+            ].map((card, i) => (
+              <div 
+                key={i} 
+                className="p-8 rounded-3xl bg-slate-50 hover:bg-blue-50/40 border border-slate-200/80 hover:border-blue-200 transition-all duration-300 flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 mb-6 shadow-sm group-hover:scale-105 transition-transform">
+                    <card.icon size={22} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    {card.desc}
+                  </p>
                 </div>
-                <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed text-center">{feature.description}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Enhanced Footer */}
-      <footer className="bg-gray-900 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            {/* Company Info */}
-            <div className="text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">AI Doctor</span>
+        {/* SECTION 4: Clean Platform Highlights */}
+        <section className="w-full px-6 sm:px-12 lg:px-16 py-14 bg-slate-950 text-white">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+            {[
+              { label: 'Input Modalities', value: 'Voice, Image & Text' },
+              { label: 'Diagnostic Classification', value: 'ICD-10 Standard' },
+              { label: 'Response Delivery', value: 'Text & Spoken Audio' },
+              { label: 'Account History', value: 'Private & Stored' }
+            ].map((metric, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-400 tracking-tight mb-2">
+                  {metric.value}
+                </span>
+                <span className="text-xs sm:text-sm text-slate-400 font-medium">
+                  {metric.label}
+                </span>
               </div>
-              <p className="text-gray-300 leading-relaxed">
-                Advanced AI-powered medical consultation platform for modern healthcare.
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 5: Safety & Medical Responsibility */}
+        <section id="safety" className="w-full px-6 sm:px-12 lg:px-16 py-14 bg-slate-50 border-t border-slate-200/80">
+          <div className="max-w-3xl mx-auto text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white border border-slate-200 text-blue-600 mx-auto shadow-sm">
+              <ShieldCheck size={26} />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Clinical Disclaimer & Safety Notice
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Medly provides preliminary symptom assessment, educational information, and ICD-10 suggestions. It is designed to assist you in preparing for a discussion with a healthcare provider and does not constitute a formal medical diagnosis or prescription.
+            </p>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 text-left flex items-start gap-3">
+              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <p>
+                <strong>Emergency Warning:</strong> If you are experiencing sudden chest pain, severe shortness of breath, sudden weakness or numbness on one side of your body, severe bleeding, or loss of consciousness, please call emergency services immediately (911 or your local emergency number).
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 6: Conversion CTA */}
+        <section className="w-full px-6 sm:px-12 lg:px-16 py-16 sm:py-24 bg-gradient-to-b from-white to-blue-50/40 flex flex-col items-center text-center">
+          <div className="w-12 h-12 flex items-center justify-center text-blue-600 mb-4">
+            <AsklepiosCross size={36} />
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-bold text-slate-950 tracking-tight max-w-2xl mb-4">
+            Start your personalized health consultation today.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 max-w-xl mb-8">
+            Speak your symptoms, attach an image, and receive instant diagnostic clarity and audio guidance.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <Link
+              to="/auth"
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-base shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+            >
+              <span>Get Started For Free</span>
+              <ArrowRight size={18} />
+            </Link>
+            <Link
+              to="/consultation"
+              className="px-8 py-4 bg-white hover:bg-slate-100 text-slate-800 rounded-2xl font-semibold text-base border border-slate-200 transition-all"
+            >
+              Start Consultation Directly
+            </Link>
+          </div>
+        </section>
+
+        {/* Modern Footer */}
+        <footer className="w-full px-6 sm:px-12 lg:px-16 py-12 border-t border-slate-200/80 bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-10">
+            <div className="md:col-span-5">
+              <div className="flex items-center gap-3 mb-3">
+                <AsklepiosCross size={24} className="text-slate-900" />
+                <span className="font-bold text-xl text-slate-900">Medly</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm">
+                AI medical doctor providing voice-guided symptom consultation, medical image inspection, ICD-10 diagnostic insights, and spoken audio responses.
               </p>
             </div>
 
-            {/* Quick Links */}
-            <div className="text-center">
-              <h4 className="text-lg font-semibold text-white mb-4">Quick Links</h4>
-              <div className="space-y-2">
-                <a href="#features" className="block text-gray-300 hover:text-emerald-400 transition-colors">Features</a>
-                <a href="#about" className="block text-gray-300 hover:text-emerald-400 transition-colors">About</a>
-                <Link to="/auth" className="block text-gray-300 hover:text-emerald-400 transition-colors">Get Started</Link>
-              </div>
+            <div className="md:col-span-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Consultation Features</h4>
+              <ul className="space-y-2 text-xs text-slate-600">
+                <li><Link to="/consultation" className="hover:text-blue-600">Voice Consultation</Link></li>
+                <li><Link to="/consultation" className="hover:text-blue-600">Medical Image Upload</Link></li>
+                <li><Link to="/health-insights" className="hover:text-blue-600">Health Insights</Link></li>
+                <li><Link to="/consultation-history" className="hover:text-blue-600">Consultation History</Link></li>
+              </ul>
             </div>
 
-            {/* Disclaimer */}
-            <div className="text-center md:text-right">
-              <h4 className="text-lg font-semibold text-white mb-4">Important</h4>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                This AI system is for educational purposes only. 
-                Always consult with licensed medical professionals.
+            <div className="md:col-span-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">Health Notice</h4>
+              <p className="text-xs text-slate-500 leading-relaxed p-3 bg-slate-50 rounded-xl border border-slate-200">
+                Medly is an artificial intelligence triage and educational support assistant. For medical treatment, prescriptions, or urgent care, always consult a licensed doctor or call emergency services.
               </p>
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row justify-between items-center text-center">
-            <p className="text-gray-400 text-sm">&copy; 2025 AI Doctor. All rights reserved.</p>
-            <div className="flex space-x-6 mt-4 sm:mt-0">
-              <a href="#privacy" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Privacy</a>
-              <a href="#terms" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Terms</a>
-              <a href="#contact" className="text-gray-400 hover:text-emerald-400 text-sm transition-colors">Contact</a>
+          <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+            <p>&copy; {new Date().getFullYear()} Medly. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <a href="#safety" onClick={(e) => handleAnchorClick(e, '#safety')} className="hover:text-slate-600">Medical Disclaimer</a>
+              <a href="#home" onClick={(e) => handleAnchorClick(e, '#home')} className="hover:text-slate-600">Back to Top</a>
+            </div>
+          </div>
+        </footer>
+
+      </main>
+
+      {/* Interactive Quick Modal for "Try For Free" button */}
+      {showQuickModal && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <AsklepiosCross size={20} className="text-blue-600" />
+                <h3 className="text-lg font-bold text-slate-900">Quick Symptom Check</h3>
+              </div>
+              <button 
+                onClick={() => setShowQuickModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p className="text-xs sm:text-sm text-slate-600 mb-4">
+              Enter your symptoms to open your personal consultation session:
+            </p>
+
+            <input
+              type="text"
+              value={quickSymptom}
+              onChange={(e) => setQuickSymptom(e.target.value)}
+              placeholder="e.g. persistent headache with mild fever"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowQuickModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <Link
+                to="/consultation"
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium text-center hover:bg-blue-700 shadow-md shadow-blue-500/25"
+              >
+                Continue
+              </Link>
             </div>
           </div>
         </div>
-      </footer>
+      )}
     </div>
   );
 };

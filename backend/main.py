@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
 import sys
+import uuid
 import tempfile
 import logging
 from pathlib import Path
@@ -11,40 +12,59 @@ import httpx
 import json
 import requests
 from datetime import datetime
+import re
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Setup audio directory for generated speech
+AUDIO_DIR = os.path.join(os.path.dirname(__file__), "temp_audio")
+os.makedirs(AUDIO_DIR, exist_ok=True)
+
+def cleanup_old_audio_files(max_age_seconds: int = 1800):
+    """Clean up temporary audio files older than max_age_seconds (default 30 min)"""
+    try:
+        now = datetime.now().timestamp()
+        for f in os.listdir(AUDIO_DIR):
+            file_path = os.path.join(AUDIO_DIR, f)
+            if os.path.isfile(file_path) and (now - os.path.getmtime(file_path)) > max_age_seconds:
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.debug(f"Audio cleanup warning: {e}")
+
 # Import existing modules
 from brain_of_doc import encode_image, analyze_image_with_query, analyze_text_only
 from voice_of_patient import transcribe_with_groq
 from voice_of_doctor import text_to_speech_elevenLabs
 
-app = FastAPI(title="AI Medical Doctor API")
+app = FastAPI(title="Medly - AI Medical Doctor API")
 
 # -------------------------
 # Supabase Setup
 # -------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
 
-print(f"=== ENVIRONMENT DEBUG ===")
-print(f"All environment variables count: {len(os.environ)}")
-print(f"SUPABASE_URL raw: '{SUPABASE_URL}'")
-print(f"SUPABASE_URL present: {SUPABASE_URL is not None}")
-print(f"SUPABASE_URL empty: {SUPABASE_URL == ''}")
-print(f"SUPABASE_URL length: {len(SUPABASE_URL) if SUPABASE_URL else 0}")
-print(f"SUPABASE_SERVICE_KEY present: {SUPABASE_KEY is not None}")
-print(f"SUPABASE_SERVICE_KEY empty: {SUPABASE_KEY == ''}")
-print(f"SUPABASE_SERVICE_KEY length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
-print(f"Environment check:")
-print(f"SUPABASE_URL: {'✓ Set' if SUPABASE_URL else '✗ Missing'}")
-print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
-print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
-print(f"Is Render environment: {bool(os.getenv('RENDER'))}")
-print(f"=========================")
+# print(f"=== ENVIRONMENT DEBUG ===")
+# print(f"All environment variables count: {len(os.environ)}")
+# print(f"SUPABASE_URL raw: '{SUPABASE_URL}'")
+# print(f"SUPABASE_URL present: {SUPABASE_URL is not None}")
+# print(f"SUPABASE_URL empty: {SUPABASE_URL == ''}")
+# print(f"SUPABASE_URL length: {len(SUPABASE_URL) if SUPABASE_URL else 0}")
+# print(f"SUPABASE_SERVICE_KEY present: {SUPABASE_KEY is not None}")
+# print(f"SUPABASE_SERVICE_KEY empty: {SUPABASE_KEY == ''}")
+# print(f"SUPABASE_SERVICE_KEY length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
+# print(f"Environment check:")
+# print(f"SUPABASE_URL: {'✓ Set' if SUPABASE_URL else '✗ Missing'}")
+# print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
+# print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
+# print(f"Is Render environment: {bool(os.getenv('RENDER'))}")
+# print(f"=========================")
 
 # Initialize supabase client only if environment variables are properly set
 supabase = None
@@ -121,7 +141,7 @@ print(f"Final Supabase status: initialized={supabase_initialized}, client_exists
 # OpenRouter Setup  
 # -------------------------
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = "z-ai/glm-4.5-air:free"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash-vl:free")
 
 # Get allowed origins from environment or use defaults
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,https://aimedicaldoc.netlify.app").split(",")
@@ -157,13 +177,19 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def clean_medical_text(text: str) -> str:
+    """Strip all asterisks (* or **) and markdown bold markers from text output"""
+    if not text:
+        return ""
+    return text.replace("**", "").replace("*", "").strip()
+
 system_prompt = """
 You are acting as a professional doctor for educational purposes only. This is not a substitute for real medical advice, and you must remind the patient to consult a certified healthcare provider for confirmation and treatment. 
 Your task is to carefully analyze the provided medical image along with the patient’s reported symptoms. Blend both sources of information to form a considerate clinical impression that feels natural, empathetic, and professional. Do not describe findings as “In the image I see” but instead use patient-centered language such as “From what you have described and what appears to be present, I think you may be experiencing…”. Keep your response concise but warm, ideally two to three sentences, while ensuring it feels supportive and clinically useful. 
 After offering your impression, you may briefly suggest general self-care measures where suitable — such as rest, hydration, gentle diet adjustments, or over-the-counter relief — provided you emphasize that these are temporary measures and not a replacement for medical evaluation. Conclude by including the most relevant ICD-10 code for the suspected condition at the end in parentheses. If you are uncertain, you may mention a few possible conditions with their ICD-10 codes and encourage the patient to follow up promptly with a qualified doctor. 
-Here is a medical image and a patient question. Image: [image]. Patient says: [transcribed audio]. Please answer using both sources in a natural and professional manner.
+CRITICAL FORMATTING REQUIREMENT: Absolutely NEVER use asterisks (* or **) or markdown bold formatting anywhere in your response. Write purely in clean, smooth plain text sentences.
+Here is a medical image and a patient question. Image: [image]. Patient says: [transcribed audio]. Please answer using both sources in a natural and professional manner without any asterisks.
 """
-
 
 voice_only_prompt = """
 You are acting as a professional doctor for educational purposes only. This is not a replacement for real medical advice, and you should kindly remind the patient to consult a certified doctor for confirmation and proper treatment. 
@@ -175,6 +201,8 @@ Respond in a clear, conversational, and caring tone as though you are speaking d
 You may gently suggest general wellness measures such as rest, hydration, light nutrition, or basic home remedies if appropriate, while emphasizing that these are only supportive options and not definitive care. 
 
 If you identify a likely condition, explain it briefly and provide the most relevant ICD-10 code at the end in parentheses. If you are not completely certain, offer a few possible conditions with their ICD-10 codes and always advise the patient to arrange a follow-up consultation with a qualified healthcare provider.
+
+CRITICAL FORMATTING REQUIREMENT: Absolutely NEVER use asterisks (* or **) or markdown bold formatting anywhere in your response. Do not bold text or diagnosis names with asterisks. Write purely in clean, smooth plain text sentences.
 """
 
 # -------------------------
@@ -184,118 +212,27 @@ If you identify a likely condition, explain it briefly and provide the most rele
 
 @app.get("/")
 async def root():
+    """Root status endpoint"""
     return {
-        "message": "AI Medical Doctor API is running",
-        "cors_origins": all_origins,
+        "status": "online",
+        "service": "Medly Health AI API",
+        "version": "1.0.0",
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/debug-environment")
-async def debug_environment():
-    """Debug endpoint to check environment variables and Supabase status"""
-    return {
-        "environment_variables": {
-            "SUPABASE_URL": {
-                "exists": bool(os.getenv("SUPABASE_URL")),
-                "is_empty": os.getenv("SUPABASE_URL") == "",
-                "length": len(os.getenv("SUPABASE_URL", "")),
-                "preview": os.getenv("SUPABASE_URL", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_URL") else "NOT_SET",
-                "equals_placeholder": os.getenv("SUPABASE_URL") == "your_supabase_url"
-            },
-            "SUPABASE_SERVICE_KEY": {
-                "exists": bool(os.getenv("SUPABASE_SERVICE_KEY")),
-                "is_empty": os.getenv("SUPABASE_SERVICE_KEY") == "",
-                "length": len(os.getenv("SUPABASE_SERVICE_KEY", "")),
-                "preview": os.getenv("SUPABASE_SERVICE_KEY", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET"
-            },
-            "OPENROUTER_API_KEY": {
-                "exists": bool(os.getenv("OPENROUTER_API_KEY")),
-                "length": len(os.getenv("OPENROUTER_API_KEY", ""))
-            },
-            "RENDER": os.getenv("RENDER", "NOT_SET"),
-            "total_env_vars": len(os.environ)
-        },
-        "supabase_status": {
-            "client_exists": supabase is not None,
-            "initialized": supabase_initialized,
-            "initialization_conditions": {
-                "url_exists": bool(SUPABASE_URL),
-                "key_exists": bool(SUPABASE_KEY),
-                "url_not_placeholder": SUPABASE_URL != "your_supabase_url" if SUPABASE_URL else False
-            }
-        },
-        "python_info": {
-            "version": sys.version,
-            "platform": sys.platform
-        }
-    }
-
-@app.get("/test-supabase")
-async def test_supabase_connection():
-    """Test Supabase connection independently with detailed error reporting"""
-    result = {
-        "environment_vars": {
-            "SUPABASE_URL": os.getenv("SUPABASE_URL", "NOT_SET"),
-            "SUPABASE_SERVICE_KEY": "SET" if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET",
-            "url_length": len(os.getenv("SUPABASE_URL", "")),
-            "key_length": len(os.getenv("SUPABASE_SERVICE_KEY", ""))
-        },
-        "client_creation": "not_attempted",
-        "connection_test": "not_attempted",
-        "table_test": "not_attempted"
-    }
-    
-    try:
-        # Step 1: Try to create client
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_KEY")
-        
-        result["client_creation"] = "attempting..."
-        test_client = create_client(url, key)
-        result["client_creation"] = "success"
-        
-        # Step 2: Try basic connection
-        result["connection_test"] = "attempting..."
-        # Simple test - try to get auth info
-        auth_result = test_client.auth.get_session()
-        result["connection_test"] = f"success - session: {type(auth_result)}"
-        
-        # Step 3: Try table access
-        result["table_test"] = "attempting..."
-        tables_result = test_client.table("health_insights").select("id").limit(1).execute()
-        result["table_test"] = f"success - found {len(tables_result.data)} records"
-        
-        result["overall_status"] = "all_tests_passed"
-        
-    except Exception as e:
-        result["error"] = {
-            "type": type(e).__name__,
-            "message": str(e),
-            "details": repr(e)
-        }
-        result["overall_status"] = "failed"
-    
-    return result
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for deployment monitoring"""
+    """Health check endpoint for deployment monitoring and uptime probes"""
     return {
         "status": "healthy",
-        "message": "AI Medical Doctor API is operational",
-        "database_configured": supabase_initialized,
-        "openrouter_configured": bool(OPENROUTER_API_KEY),
-        "cors_origins": all_origins,
-        "timestamp": datetime.now().isoformat(),
-        "environment_debug": {
-            "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
-            "supabase_key_set": bool(os.getenv("SUPABASE_SERVICE_KEY")),
-            "openrouter_key_set": bool(os.getenv("OPENROUTER_API_KEY")),
-            "supabase_url_preview": os.getenv("SUPABASE_URL", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_URL") else "NOT_SET",
-            "supabase_key_preview": os.getenv("SUPABASE_SERVICE_KEY", "NOT_SET")[:30] + "..." if os.getenv("SUPABASE_SERVICE_KEY") else "NOT_SET",
-            "all_env_vars": list(os.environ.keys())[:10]  # Show first 10 env vars for debugging
-        }
+        "service": "Medly Health AI API",
+        "version": "1.0.0",
+        "database": "connected" if supabase_initialized else "disconnected",
+        "ai_engine": "operational" if bool(OPENROUTER_API_KEY) else "unconfigured",
+        "timestamp": datetime.now().isoformat()
     }
+
 
 @app.post("/transcribe-audio")
 async def transcribe_audio(audio: UploadFile = File(...)):
@@ -347,7 +284,7 @@ async def analyze_image(
         # Clean up temp file
         os.unlink(temp_image_path)
         
-        return {"analysis": analysis}
+        return {"analysis": clean_medical_text(analysis)}
     
     except Exception as e:
         logger.error(f"Image analysis error: {e}")
@@ -355,14 +292,18 @@ async def analyze_image(
 
 @app.post("/text-to-speech")
 async def convert_text_to_speech(text_input: dict):
-    """Convert text to speech using ElevenLabs"""
+    """Convert text to speech using ElevenLabs or gTTS fallback"""
     try:
         text = text_input.get("text", "")
         if not text:
             raise HTTPException(status_code=400, detail="Text is required")
         
-        # Generate audio file
-        output_path = f"temp_audio_{os.getpid()}.mp3"
+        # Periodic cleanup of old audio files
+        cleanup_old_audio_files()
+
+        # Generate uniquely named audio file in audio dir
+        filename = f"tts_{uuid.uuid4().hex[:10]}.mp3"
+        output_path = os.path.join(AUDIO_DIR, filename)
         text_to_speech_elevenLabs(input_text=text, output_filepath=output_path)
         
         # Return audio file
@@ -561,12 +502,16 @@ If the image shows ANY medical condition or symptom, provide your analysis norma
                 full_prompt = voice_only_prompt.replace("[transcribed_symptoms]", transcription)
                 logger.info(f"✓ Formatted text-only prompt: {full_prompt[:200]}...")
                 
-                analysis = analyze_text_only(full_prompt)
+                analysis = clean_medical_text(analyze_text_only(full_prompt))
                 logger.info(f"✓ Text/Voice-only analysis successful: {analysis[:100]}...")
             except Exception as text_error:
                 logger.error(f"✗ Text analysis failed: {text_error}")
                 raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(text_error)}")
         
+        # Ensure analysis is sanitized of any asterisks
+        if analysis:
+            analysis = clean_medical_text(analysis)
+
         # ✅ Updated validation
         if not analysis and not transcription:
             raise HTTPException(
@@ -597,21 +542,25 @@ If the image shows ANY medical condition or symptom, provide your analysis norma
             logger.warning(f"⚠ Consultation not saved - Supabase: {bool(supabase)}, UserID: {bool(user_id)}, Analysis: {bool(analysis)}")
         
         # Generate audio response
-        audio_path = None
+        # Generate audio response
+        audio_filename = None
         if analysis:
             try:
-                audio_path = f"temp_response_{os.getpid()}.mp3"
-                text_to_speech_elevenLabs(input_text=analysis, output_filepath=audio_path)
-                logger.info(f"✓ Audio response generated: {audio_path}")
+                cleanup_old_audio_files()
+                audio_filename = f"response_{uuid.uuid4().hex[:10]}.mp3"
+                full_audio_path = os.path.join(AUDIO_DIR, audio_filename)
+                text_to_speech_elevenLabs(input_text=analysis, output_filepath=full_audio_path)
+                logger.info(f"✓ Audio response generated: {audio_filename}")
             except Exception as tts_error:
                 logger.error(f"✗ Text-to-speech failed: {tts_error}")
                 # Continue without audio - analysis is still valid
-                audio_path = None
+                audio_filename = None
         
+        audio_exists = audio_filename and os.path.exists(os.path.join(AUDIO_DIR, audio_filename))
         response = {
             "transcription": transcription,
             "analysis": analysis,
-            "audio_url": f"/download-audio/{audio_path}" if audio_path and os.path.exists(audio_path) else None,
+            "audio_url": f"/download-audio/{audio_filename}" if audio_exists else None,
             "consultation_id": consultation_id,
             "saved_to_database": bool(consultation_id)
         }
@@ -647,266 +596,210 @@ async def medical_consultation_get(limit: int = Query(10, description="Number of
 # -------------------------
 # Health Insights API Endpoints
 # -------------------------
-def extract_remedies_from_text(analysis_text: str) -> List[Dict]:
-    """Extract remedy-like recommendations from consultation analysis text"""
-    if not analysis_text:
+def extract_meaningful_insights(consultations: List[Dict]) -> List[Dict]:
+    """Extract clinical conditions, practical recommendations, and precautions from consultation history"""
+    if not consultations:
         return []
     
-    remedies = []
+    insights = []
+    seen_issues = set()
     
-    # Common patterns to look for remedies/recommendations
-    remedy_keywords = [
-        "rest", "hydration", "drink", "water", "sleep", "avoid", "apply", 
-        "take", "use", "medication", "treatment", "therapy", "exercise",
-        "diet", "nutrition", "warm", "cold", "compress", "elevate",
-        "gentle", "massage", "steam", "gargle", "rinse", "wash"
-    ]
-    
-    # Split text into sentences
-    sentences = analysis_text.replace('.', '.\n').replace('!', '!\n').replace('?', '?\n').split('\n')
-    sentences = [s.strip() for s in sentences if s.strip()]
-    
-    for sentence in sentences:
-        sentence_lower = sentence.lower()
+    for c in consultations:
+        txt = (c.get("transcription") or "").lower()
+        analysis = clean_medical_text(c.get("analysis") or "")
+        cid = c.get("id") or str(uuid.uuid4())
+        created_at = c.get("created_at") or datetime.now().isoformat()
         
-        # Check if sentence contains remedy keywords
-        if any(keyword in sentence_lower for keyword in remedy_keywords):
-            if len(sentence) > 20 and len(sentence) < 200:  # Reasonable length
-                urgency = "low"
-                if any(urgent in sentence_lower for urgent in ["immediately", "urgent", "serious", "severe"]):
-                    urgency = "high"
-                elif any(moderate in sentence_lower for moderate in ["important", "should", "recommend"]):
-                    urgency = "medium"
-                
-                remedies.append({
-                    "id": f"remedy-{len(remedies)}",
-                    "issue": "Health Recommendation",
-                    "advice": sentence.strip(),
-                    "urgency": urgency,
-                    "consultation_count": 1,
-                    "created_at": datetime.now().isoformat()
-                })
-    
-    # If no specific remedies found, extract general advice
-    if not remedies:
-        # Look for ICD-10 codes and recommendations around them
-        lines = analysis_text.split('.')
-        for line in lines:
-            if len(line.strip()) > 30 and len(line.strip()) < 150:
-                remedies.append({
-                    "id": f"general-{len(remedies)}",
-                    "issue": "General Health Advice",
-                    "advice": line.strip(),
-                    "urgency": "medium",
-                    "consultation_count": 1,
-                    "created_at": datetime.now().isoformat()
-                })
-                if len(remedies) >= 3:  # Limit to 3 insights
-                    break
-    
-    return remedies[:3]  # Limit to top 3 remedies
+        issue = None
+        avoid = "Avoid self-medicating with unprescribed medications. Avoid strenuous physical stress."
+        urgency = "medium"
+        
+        if any(w in txt for w in ["peeth", "back", "lumbar", "spine", "kamar"]):
+            issue = "Lumbar Strain & Musculoskeletal Back Pain"
+            avoid = "Avoid prolonged sitting on unsupported surfaces (like beds or soft couches). Avoid sudden bending or heavy lifting."
+            urgency = "high" if any(w in txt for w in ["bahut", "severe", "zyada", "bad"]) else "medium"
+        elif any(w in txt for w in ["headache", "sir dard", "migraine", "head"]):
+            issue = "Recurrent Tension Headache & Screen Strain"
+            avoid = "Avoid continuous screen time without 20-20-20 breaks. Avoid skipping meals and dehydration."
+            urgency = "medium"
+        elif any(w in txt for w in ["cough", "cold", "fever", "chills", "throat", "gala"]):
+            issue = "Upper Respiratory Viral Infection & Fever"
+            avoid = "Avoid cold drinks, chilling exposure, and strenuous workouts during active fever."
+            urgency = "high" if "fever" in txt else "medium"
+        elif any(w in txt for w in ["chest", "breath", "saans"]):
+            issue = "Cardiorespiratory Monitoring"
+            avoid = "Avoid physical overexertion. Seek emergency medical care immediately if shortness of breath worsens."
+            urgency = "high"
+        elif any(w in txt for w in ["stomach", "pet", "acidity", "nausea", "vomit", "gas"]):
+            issue = "Gastrointestinal Irritation & Acidity"
+            avoid = "Avoid oily, spicy meals, lying down immediately after eating, and excess caffeine."
+            urgency = "medium"
+        else:
+            m = re.search(r'([A-Za-z\s]{4,35}\([A-Z0-9\.\-]+\))', analysis)
+            if m:
+                issue = m.group(1).strip()
+            elif txt:
+                clean_symptom = re.sub(r'[^a-zA-Z0-9\s]', '', txt).strip()
+                issue = (clean_symptom[:40] + ("..." if len(clean_symptom) > 40 else "")).title()
+            else:
+                issue = "Clinical Medical Consultation"
+        
+        if issue in seen_issues:
+            continue
+        seen_issues.add(issue)
+        
+        sentences = [s.strip() for s in re.split(r'[.!?\n]+', analysis) if len(s.strip()) > 30]
+        advice_candidates = [s for s in sentences if any(k in s.lower() for k in [
+            'recommend', 'rest', 'doctor', 'treatment', 'water', 'hydration',
+            'support', 'posture', 'relief', 'care', 'compress', 'medicine'
+        ])]
+        advice = advice_candidates[0] if advice_candidates else (sentences[0] if sentences else "Follow up with a healthcare provider for ongoing assessment.")
+
+        recurrence = sum(1 for other in consultations if issue[:8].lower() in (other.get("transcription") or "").lower() or issue[:8].lower() in (other.get("analysis") or "").lower())
+        
+        insights.append({
+            "id": cid,
+            "issue": issue,
+            "advice": advice,
+            "full_advice": analysis if analysis else advice,
+            "symptoms": c.get("transcription") or "",
+            "avoid": avoid,
+            "urgency": urgency,
+            "consultation_count": max(1, recurrence),
+            "created_at": created_at
+        })
+        
+        if len(insights) >= 5:
+            break
+            
+    return insights
 
 @app.get("/api/health-insights/{user_id}")
 async def get_health_insights_from_consultations(user_id: str):
-    """Get health insights extracted from recent consultation analysis"""
+    """Get personalized health insights and precautions from consultation history"""
     try:
-        logger.info(f"📊 Fetching health insights for user: {user_id}")
-        logger.info(f"   Supabase initialized: {supabase_initialized}")
-        logger.info(f"   Supabase client exists: {supabase is not None}")
-        
-        # Try to get from database first
         if supabase and supabase_initialized:
             try:
-                logger.info(f"   Querying consultations table...")
-                consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+                res = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
+                consultations = res.data or []
                 
-                logger.info(f"   Database response received: {len(consultations_response.data) if consultations_response.data else 0} consultations")
-                logger.info(f"   Consultation data: {consultations_response.data}")
-                if consultations_response.data and len(consultations_response.data) > 0:
-                    all_remedies = []
-                    for idx, consultation in enumerate(consultations_response.data):
-                        analysis = consultation.get("analysis", "")
-                        logger.info(f"   Processing consultation {idx + 1}: Analysis length = {len(analysis)}")
-                        
-                        if analysis:
-                            remedies = extract_remedies_from_text(analysis)
-                            logger.info(f"   Extracted {len(remedies)} remedies from consultation {idx + 1}")
-                            all_remedies.extend(remedies)
-                    
-                    # Remove duplicates and limit to 5
-                    unique_remedies = []
-                    seen_advice = set()
-                    for remedy in all_remedies:
-                        if remedy["advice"] not in seen_advice:
-                            unique_remedies.append(remedy)
-                            seen_advice.add(remedy["advice"])
-                        if len(unique_remedies) >= 5:
-                            break
-                    
-                    logger.info(f"✓ Returning {len(unique_remedies)} unique insights from database")
-                    
-                    if unique_remedies:
-                        return {
-                            "insights": unique_remedies,
-                            "database_configured": True,
-                            "source": "database_consultations",
-                            "consultation_count": len(consultations_response.data)
-                        }
-                    else:
-                        logger.warning(f"⚠ No remedies extracted from {len(consultations_response.data)} consultations")
-                else:
-                    logger.info(f"⚠ No consultations found in database for user: {user_id}")
-            except Exception as db_error:
-                logger.error(f"✗ Database consultation fetch failed: {db_error}")
-                logger.error(f"   Error type: {type(db_error).__name__}")
-                logger.error(f"   Error details: {repr(db_error)}")
-        else:
-            logger.warning(f"⚠ Supabase not available - initialized: {supabase_initialized}, client: {supabase is not None}")
+                if consultations:
+                    insights = extract_meaningful_insights(consultations)
+                    return {
+                        "insights": insights,
+                        "consultation_count": len(consultations),
+                        "source": "extracted_from_consultations"
+                    }
+            except Exception as db_err:
+                logger.error(f"Error querying consultations for insights: {db_err}")
         
-        # Fallback: Return general health insights
-        logger.info("→ Returning fallback general health insights")
-        fallback_insights = [
+        # Clinical baseline guidelines when no prior records exist
+        baseline_insights = [
             {
-                "id": "general-1",
-                "issue": "Daily Hydration",
-                "advice": "Drink 8-10 glasses of water daily to maintain proper hydration, support kidney function, and help your body eliminate toxins naturally.",
+                "id": "baseline-1",
+                "issue": "Consultation History & Longitudinal Tracking",
+                "advice": "Complete your first consultation. Medly will automatically extract diagnosis timelines, recurrence rates, and personalized care plans.",
+                "avoid": "Avoid relying solely on general search queries when experiencing acute or worsening symptoms.",
                 "urgency": "low",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             },
             {
-                "id": "general-2",
-                "issue": "Quality Sleep",
-                "advice": "Aim for 7-9 hours of quality sleep each night to allow your body to repair, boost immune function, and maintain mental clarity.",
+                "id": "baseline-2",
+                "issue": "Ergonomics & Workstation Posture",
+                "advice": "Ensure lower lumbar support when sitting for long periods. Take a 2-minute posture break every 45 minutes to prevent spinal fatigue.",
+                "avoid": "Avoid sitting unsupported on beds or soft couches for longer than 30 minutes while working on a laptop.",
                 "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "general-3",
-                "issue": "Regular Exercise",
-                "advice": "Engage in at least 30 minutes of moderate exercise daily, such as brisk walking, to improve cardiovascular health and boost energy levels.",
-                "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "general-4",
-                "issue": "Stress Management",
-                "advice": "Practice stress-reduction techniques like deep breathing, meditation, or yoga to support mental health and overall well-being.",
-                "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            },
-            {
-                "id": "general-5",
-                "issue": "Preventive Healthcare",
-                "advice": "Schedule regular check-ups with healthcare professionals for early detection and prevention of health issues.",
-                "urgency": "high",
                 "consultation_count": 0,
                 "created_at": datetime.now().isoformat()
             }
         ]
-        
         return {
-            "insights": fallback_insights,
-            "database_configured": bool(supabase),
-            "source": "general_health_guidelines",
-            "message": "Complete a consultation to get personalized health insights based on your symptoms and conditions.",
-            "debug_info": {
-                "supabase_initialized": supabase_initialized,
-                "user_id_provided": bool(user_id)
-            }
+            "insights": baseline_insights,
+            "consultation_count": 0,
+            "source": "baseline_guidelines"
         }
-        
     except Exception as e:
-        logger.error(f"✗ Error getting health insights: {str(e)}")
-        logger.error(f"   Error type: {type(e).__name__}")
-        return {
-            "insights": [],
-            "error": f"Error getting insights: {str(e)}",
-            "database_configured": bool(supabase),
-            "source": "error"
-        }
+        logger.error(f"Health insights error: {e}")
+        return {"insights": [], "consultation_count": 0, "error": str(e)}
 
 @app.post("/api/health-insights")
 async def generate_health_insights_from_consultations(request: dict):
-    """Generate health insights from recent consultation data"""
+    """Generate or refresh health insights from consultation data"""
     try:
         user_id = request.get("user_id")
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID required")
-        
-        # Try to get recent consultations from database
-        if supabase:
-            try:
-                consultations_response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
-                
-                if consultations_response.data:
-                    all_remedies = []
-                    for consultation in consultations_response.data:
-                        analysis = consultation.get("analysis", "")
-                        transcription = consultation.get("transcription", "")
-                        
-                        # Extract remedies from analysis text
-                        if analysis:
-                            remedies = extract_remedies_from_text(analysis)
-                            all_remedies.extend(remedies)
-                        
-                        # Also extract from transcription for symptoms context
-                        if transcription and len(all_remedies) < 3:
-                            symptom_advice = extract_remedies_from_text(transcription)
-                            all_remedies.extend(symptom_advice)
-                    
-                    # Remove duplicates and prioritize
-                    unique_remedies = []
-                    seen_advice = set()
-                    for remedy in all_remedies:
-                        advice_key = remedy["advice"].lower()[:50]  # Compare first 50 chars
-                        if advice_key not in seen_advice:
-                            unique_remedies.append(remedy)
-                            seen_advice.add(advice_key)
-                        if len(unique_remedies) >= 5:
-                            break
-                    
-                    if unique_remedies:
-                        return {
-                            "insights": unique_remedies,
-                            "consultation_count": len(consultations_response.data),
-                            "source": "extracted_from_consultations"
-                        }
-                else:
-                    return {
-                        "insights": [],
-                        "message": "No consultations found. Complete a consultation first to get personalized insights.",
-                        "consultation_count": 0
-                    }
             
-            except Exception as db_error:
-                print(f"Database error in health insights generation: {db_error}")
-        
-        # Fallback: Return helpful general health insights
-        general_insights = [
-            {
-                "id": "wellness-1",
-                "issue": "Nutrition Balance",
-                "advice": "Maintain a balanced diet rich in fruits, vegetables, whole grains, and lean proteins to support optimal body function and immune health.",
-                "urgency": "medium",
-                "consultation_count": 0,
-                "created_at": datetime.now().isoformat()
-            }
-        ]
-        
-        return {
-            "insights": general_insights,
-            "consultation_count": 0,
-            "source": "comprehensive_wellness_guide",
-            "message": "Comprehensive wellness recommendations for maintaining optimal health. Complete consultations to unlock personalized insights based on your specific health patterns."
-        }
-        
+        if supabase and supabase_initialized:
+            res = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
+            consultations = res.data or []
+            if consultations:
+                insights = extract_meaningful_insights(consultations)
+                return {
+                    "insights": insights,
+                    "consultation_count": len(consultations),
+                    "source": "extracted_from_consultations"
+                }
+                
+        return await get_health_insights_from_consultations(user_id)
     except Exception as e:
-        print(f"Health insights generation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating insights: {str(e)}")
+        logger.error(f"Health insights generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/health-insights/chat")
+async def health_insights_chat(request: dict):
+    """AI Clinical Assistant that answers questions dynamically based on past consultations"""
+    try:
+        user_id = request.get("user_id")
+        message = (request.get("message") or "").strip()
+        
+        if not user_id or not message:
+            raise HTTPException(status_code=400, detail="user_id and message are required")
+            
+        consultations = []
+        if supabase and supabase_initialized:
+            try:
+                res = supabase.table("consultations").select("created_at, transcription, analysis").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
+                consultations = res.data or []
+            except Exception as db_err:
+                logger.error(f"Error fetching consultations for chat: {db_err}")
+                
+        if not consultations:
+            return {
+                "reply": "You don't have any recorded consultations yet. Once you complete a session with the AI Doctor, I can answer questions about your reported symptoms, exact dates, recurring patterns, and specific precautions."
+            }
+            
+        history_lines = []
+        for idx, c in enumerate(consultations, 1):
+            dt = (c.get("created_at") or "")[:10]
+            symptoms = (c.get("transcription") or "General clinical check").strip()
+            analysis = clean_medical_text(c.get("analysis") or "")[:700].strip()
+            history_lines.append(f"Consultation #{idx} [Date: {dt}]:\n- Patient Symptoms: {symptoms}\n- Clinical Analysis & Advice: {analysis}")
+            
+        history_context = "\n\n".join(history_lines)
+        
+        prompt = f"""You are Medly Health Assistant, an empathetic, intelligent clinical AI assistant.
+The patient is asking a question specifically about their medical records and past consultations.
+Answer strictly, accurately, and thoughtfully based on their consultation history below.
+
+Patient Consultation Records:
+{history_context}
+
+Patient Question: {message}
+
+Clinical Answering Rules:
+1. When asked when they had an illness or symptom (e.g. fever, cough, back pain, headache), state the exact dates from their consultation records.
+2. When asked what they should or should NOT do (e.g. "what should I avoid?"), list specific, practical precautions, ergonomic adjustments, and self-care steps tailored to the conditions they consulted about.
+3. Be concise, clear, and professional.
+4. Do NOT use markdown bold asterisks (**) in your output, keep text clean and readable.
+5. If they ask about something not recorded in their history, clearly clarify that it is not present in their past consultations, but provide safe general guidance."""
+
+        reply = clean_medical_text(analyze_text_only(prompt))
+        return {"reply": reply}
+    except Exception as e:
+        logger.error(f"Health insights chat error: {e}")
+        return {"reply": f"Sorry, I encountered an issue accessing your records: {str(e)}"}
 
 @app.delete("/api/health-insights/{insight_id}")
 async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
@@ -927,12 +820,20 @@ async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
         }
 
 
-@app.get("/download-audio/{filename}")
+@app.api_route("/download-audio/{filename}", methods=["GET", "HEAD"])
 async def download_audio(filename: str):
-    """Download generated audio file"""
-    if os.path.exists(filename):
+    """Download generated audio file safely"""
+    safe_name = os.path.basename(filename)
+    path_in_dir = os.path.join(AUDIO_DIR, safe_name)
+    if os.path.exists(path_in_dir):
         return FileResponse(
-            path=filename,
+            path=path_in_dir,
+            media_type="audio/mpeg",
+            filename="doctor_response.mp3"
+        )
+    elif os.path.exists(safe_name):
+        return FileResponse(
+            path=safe_name,
             media_type="audio/mpeg",
             filename="doctor_response.mp3"
         )
@@ -942,8 +843,4 @@ async def download_audio(filename: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    # Use app object directly instead of string reference to avoid module import issues
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
-    port = int(os.getenv("PORT", 8000))
-    # Use app object directly instead of string reference to avoid module import issues
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

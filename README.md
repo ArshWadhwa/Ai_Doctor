@@ -1,9 +1,12 @@
 
-# 🏥 AI Medical Doctor
+# 🏥 Medly - AI Health Consultation Platform
 
-A cutting-edge, full-stack medical consultation platform powered by advanced AI technologies. This application provides instant medical analysis through voice recognition, medical image analysis, and professional AI-generated responses with ICD-10 medical codes.
+A modern, full-stack medical triage and consultation platform. Medly provides instant differential medical assessments through **voice input, clinical image analysis, and typed symptoms**, paired with standard **ICD-10 clinical codes** and natural **spoken audio doctor responses**.
 
-![Medical AI](https://img.shields.io/badge/Medical-AI-blue) ![React](https://img.shields.io/badge/React-19.1.1-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green) ![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue) ![Python](https://img.shields.io/badge/Python-3.12-yellow)
+> 📖 **Comprehensive Project Documentation**: For complete architecture diagrams, model fallback flows, and end-to-end consultation lifecycle details, see [PROJECT_GUIDE.md](file:///Users/arshwadhwa/Workspace/projects/Ai-Medical-Doctor/PROJECT_GUIDE.md).
+
+![Medical AI](https://img.shields.io/badge/Medical-AI-blue) ![React](https://img.shields.io/badge/React-19.1.1-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green) ![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue) ![Python](https://img.shields.io/badge/Python-3.14-yellow)
+
 
 ## 🌟 Features
 

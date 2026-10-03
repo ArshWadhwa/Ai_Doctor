@@ -16,7 +16,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (loading) {
     return (
-      <div className="min-h-screen  flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-green-400/30 border-t-green-400 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white/70">Loading...</p>
@@ -34,12 +34,12 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (loading) {
     return (
-      
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-green-400/30 border-t-green-400 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white/70">Loading...</p>
         </div>
-
+      </div>
     );
   }
 
@@ -52,15 +52,8 @@ function App() {
       <Router>
         <div className="App">
           <Routes>
-            {/* Public Routes */}
-            <Route 
-              path="/" 
-              element={
-                <PublicRoute>
-                  <LandingPage />
-                </PublicRoute>
-              } 
-            />
+            {/* Landing Page */}
+            <Route path="/" element={<LandingPage />} />
             <Route 
               path="/auth" 
               element={

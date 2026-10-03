@@ -28,26 +28,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true;
+
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { user } } = await authService.getCurrentUser()
-      setUser(user)
-      setLoading(false)
-    }
+      try {
+        const response = await authService.getCurrentUser();
+        if (isMounted) {
+          setUser(response?.data?.user ?? null);
+        }
+      } catch (error) {
+        console.warn('Could not fetch current user session:', error);
+        if (isMounted) {
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-    getInitialSession()
+    getInitialSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = authService.onAuthStateChange(async (event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    let subscription: any = null;
+    try {
+      const authListener = authService.onAuthStateChange(async (event, session) => {
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      });
+      subscription = authListener?.data?.subscription;
+    } catch (error) {
+      console.warn('Could not subscribe to auth state changes:', error);
+    }
+
+    // Safety timeout: ensure loading state never hangs indefinitely
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 1500);
 
     return () => {
-      subscription?.unsubscribe()
-    }
-  }, [])
+      isMounted = false;
+      clearTimeout(timer);
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     setLoading(true)
