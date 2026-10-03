@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string, fullName: string) => Promise<{ data: any; error: any }>
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
+  signInWithGoogle: () => Promise<{ data: any; error: any }>
   signOut: () => Promise<{ error: any }>
   resetPassword: (email: string) => Promise<{ data: any; error: any }>
 }
@@ -124,6 +125,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const signInWithGoogle = async () => {
+    setLoading(true)
+    try {
+      console.log('Attempting to sign in with Google OAuth')
+      const result = await authService.signInWithGoogle()
+      if (result.error) {
+        console.error('Google sign in error:', result.error)
+        setLoading(false)
+      }
+      return result
+    } catch (error) {
+      console.error('Google sign in exception:', error)
+      setLoading(false)
+      return { data: null, error: { message: 'Failed to initialize Google Sign In' } }
+    }
+  }
+
   const signOut = async () => {
     setLoading(true)
     const result = await authService.signOut()
@@ -141,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     resetPassword,
   }
