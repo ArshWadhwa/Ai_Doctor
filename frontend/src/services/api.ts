@@ -12,17 +12,13 @@ const getApiBaseUrl = () => {
   const productionApiUrl = process.env.REACT_APP_API_BASE_URL || 'https://ai-doctor-tq5i.onrender.com';
   
   if (isDevelopment) {
-    console.log('🔧 Development mode detected - using localhost API');
     return localApiUrl;
   } else {
-    console.log('🚀 Production mode detected - using deployed API');
     return productionApiUrl;
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
-
-console.log('API Base URL:', API_BASE_URL); // Debug log
 
 // Export for use in other components
 export { API_BASE_URL };

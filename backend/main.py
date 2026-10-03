@@ -19,9 +19,26 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Security & Validation Constants
+MAX_AUDIO_SIZE_BYTES = 15 * 1024 * 1024   # 15 MB
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024   # 10 MB
+MAX_TEXT_INPUT_LENGTH = 4000              # Max chars for medical description/TTS
+MAX_CHAT_MESSAGE_LENGTH = 1000            # Max chars for health assistant queries
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+def is_valid_uuid(val: str) -> bool:
+    """Validate string as a standard UUID (v4/v1)"""
+    if not val or not isinstance(val, str):
+        return False
+    return bool(re.match(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', val.strip()))
+
 # Setup audio directory for generated speech
 AUDIO_DIR = os.path.join(os.path.dirname(__file__), "temp_audio")
 os.makedirs(AUDIO_DIR, exist_ok=True)
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 def cleanup_old_audio_files(max_age_seconds: int = 1800):
     """Clean up temporary audio files older than max_age_seconds (default 30 min)"""
@@ -50,92 +67,27 @@ app = FastAPI(title="Medly - AI Medical Doctor API")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
 
-# print(f"=== ENVIRONMENT DEBUG ===")
-# print(f"All environment variables count: {len(os.environ)}")
-# print(f"SUPABASE_URL raw: '{SUPABASE_URL}'")
-# print(f"SUPABASE_URL present: {SUPABASE_URL is not None}")
-# print(f"SUPABASE_URL empty: {SUPABASE_URL == ''}")
-# print(f"SUPABASE_URL length: {len(SUPABASE_URL) if SUPABASE_URL else 0}")
-# print(f"SUPABASE_SERVICE_KEY present: {SUPABASE_KEY is not None}")
-# print(f"SUPABASE_SERVICE_KEY empty: {SUPABASE_KEY == ''}")
-# print(f"SUPABASE_SERVICE_KEY length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
-# print(f"Environment check:")
-# print(f"SUPABASE_URL: {'✓ Set' if SUPABASE_URL else '✗ Missing'}")
-# print(f"SUPABASE_SERVICE_KEY: {'✓ Set' if SUPABASE_KEY else '✗ Missing'}")
-# print(f"OPENROUTER_API_KEY: {'✓ Set' if os.getenv('OPENROUTER_API_KEY') else '✗ Missing'}")
-# print(f"Is Render environment: {bool(os.getenv('RENDER'))}")
-# print(f"=========================")
-
-# Initialize supabase client only if environment variables are properly set
 supabase = None
 supabase_initialized = False
 
-print(f"Checking Supabase initialization conditions:")
-print(f"SUPABASE_URL exists: {bool(SUPABASE_URL)}")
-print(f"SUPABASE_KEY exists: {bool(SUPABASE_KEY)}")
-print(f"SUPABASE_URL not placeholder: {SUPABASE_URL != 'your_supabase_url'}")
-
 if SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL != "your_supabase_url":
     try:
-        print(f"✓ All conditions met - Attempting to create Supabase client...")
-        print(f"URL: {SUPABASE_URL[:30]}...")
-        print(f"Key length: {len(SUPABASE_KEY)}")
-        print(f"Environment: Production={os.getenv('RENDER')}, Local={not os.getenv('RENDER')}")
-        
         # Remove proxy-related environment variables that might interfere
         proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']
         for var in proxy_vars:
             if var in os.environ:
-                print(f"Removing {var} environment variable")
                 del os.environ[var]
         
-        # Create client with minimal options
         from supabase import create_client
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         supabase_initialized = True
-        print("✓ Supabase client created successfully")
-        
-        # Test the connection with a simple operation
-        try:
-            # Just test that we can access the client, don't check specific tables yet
-            print("✓ Supabase marked as initialized and ready")
-        except Exception as test_error:
-            print(f"⚠ Supabase client created but connection test failed: {test_error}")
-            # Keep the client anyway, it might work for actual operations
-            
-    except TypeError as type_error:
-        if "proxy" in str(type_error):
-            print(f"✗ Supabase proxy error detected. Trying alternative initialization...")
-            try:
-                # Try importing the Client class directly and creating without proxy
-                from supabase import Client
-                supabase = Client(SUPABASE_URL, SUPABASE_KEY)
-                supabase_initialized = True
-                print("✓ Supabase client created successfully with alternative method")
-            except Exception as alt_error:
-                print(f"✗ Alternative Supabase initialization also failed: {alt_error}")
-                supabase = None
-                supabase_initialized = False
-        else:
-            print(f"✗ Supabase client initialization failed with TypeError: {type_error}")
-            supabase = None
-            supabase_initialized = False
-    except Exception as e:
-        print(f"✗ Supabase client initialization failed: {e}")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error details: {repr(e)}")
-        print(f"Is production environment: {bool(os.getenv('RENDER'))}")
+        logger.info("Supabase client initialized successfully")
+    except Exception as init_err:
+        logger.warning(f"Supabase client initialization failed: {init_err}")
         supabase = None
         supabase_initialized = False
 else:
-    print("✗ Supabase not configured. Check environment variables.")
-    print(f"   SUPABASE_URL: {SUPABASE_URL[:20] + '...' if SUPABASE_URL else 'None'}")
-    print(f"   SUPABASE_KEY: {SUPABASE_KEY[:20] + '...' if SUPABASE_KEY else 'None'}")
-    print(f"   Condition 1 (URL exists): {bool(SUPABASE_URL)}")
-    print(f"   Condition 2 (KEY exists): {bool(SUPABASE_KEY)}")
-    print(f"   Condition 3 (URL not placeholder): {SUPABASE_URL != 'your_supabase_url'}")
-
-print(f"Final Supabase status: initialized={supabase_initialized}, client_exists={supabase is not None}")
+    logger.info("Supabase credentials not configured in environment")
 
 # -------------------------
 # OpenRouter Setup  
@@ -236,86 +188,119 @@ async def health_check():
 
 @app.post("/transcribe-audio")
 async def transcribe_audio(audio: UploadFile = File(...)):
-    """Transcribe audio to text using Groq API"""
+    """Transcribe audio to text using Groq API with size validation"""
+    temp_audio_path = None
     try:
-        # Save uploaded audio file temporarily
+        content = await audio.read()
+        if len(content) > MAX_AUDIO_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"Audio file exceeds maximum size of {MAX_AUDIO_SIZE_BYTES // (1024 * 1024)}MB"
+            )
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded audio file is empty")
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-            content = await audio.read()
             temp_audio.write(content)
             temp_audio_path = temp_audio.name
         
-        # Transcribe audio
         transcription = transcribe_with_groq(
             GROQ_API_KEY=os.environ.get("GROQ_API_KEY"),
             audio_filepath=temp_audio_path,
             stt_model="whisper-large-v3"
         )
-        
-        # Clean up temp file
-        os.unlink(temp_audio_path)
-        
         return {"transcription": transcription}
-    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Audio transcription error: {e}")
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Transcription failed")
+    finally:
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.unlink(temp_audio_path)
+            except Exception:
+                pass
 
 @app.post("/analyze-image")
 async def analyze_image(
     image: UploadFile = File(...),
     transcription: str = ""
 ):
-    """Analyze medical image with optional audio transcription"""
+    """Analyze medical image with optional audio transcription and size limits"""
+    temp_image_path = None
     try:
-        # Save uploaded image file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
-            content = await image.read()
+        if not image.content_type or image.content_type.lower() not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid image type. Please upload a JPEG, PNG, or WebP image.")
+            
+        content = await image.read()
+        if len(content) > MAX_IMAGE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"Image file exceeds maximum size of {MAX_IMAGE_SIZE_BYTES // (1024 * 1024)}MB"
+            )
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded image is empty")
+
+        if transcription and len(transcription) > MAX_TEXT_INPUT_LENGTH:
+            transcription = transcription[:MAX_TEXT_INPUT_LENGTH]
+
+        file_ext = ".jpg"
+        if "png" in image.content_type.lower():
+            file_ext = ".png"
+        elif "webp" in image.content_type.lower():
+            file_ext = ".webp"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_image:
             temp_image.write(content)
             temp_image_path = temp_image.name
         
-        # Analyze image
         full_prompt = system_prompt + transcription if transcription else system_prompt
         analysis = analyze_image_with_query(
             full_prompt,
             "meta-llama/llama-4-scout-17b-16e-instruct",
             encode_image(temp_image_path)
         )
-        
-        # Clean up temp file
-        os.unlink(temp_image_path)
-        
         return {"analysis": clean_medical_text(analysis)}
-    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Image analysis error: {e}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Analysis failed")
+    finally:
+        if temp_image_path and os.path.exists(temp_image_path):
+            try:
+                os.unlink(temp_image_path)
+            except Exception:
+                pass
 
 @app.post("/text-to-speech")
 async def convert_text_to_speech(text_input: dict):
-    """Convert text to speech using ElevenLabs or gTTS fallback"""
+    """Convert text to speech using ElevenLabs or gTTS fallback with length limits"""
     try:
         text = text_input.get("text", "")
-        if not text:
+        if not text or not isinstance(text, str):
             raise HTTPException(status_code=400, detail="Text is required")
         
-        # Periodic cleanup of old audio files
+        if len(text) > MAX_TEXT_INPUT_LENGTH:
+            text = text[:MAX_TEXT_INPUT_LENGTH]
+        
         cleanup_old_audio_files()
 
-        # Generate uniquely named audio file in audio dir
         filename = f"tts_{uuid.uuid4().hex[:10]}.mp3"
         output_path = os.path.join(AUDIO_DIR, filename)
         text_to_speech_elevenLabs(input_text=text, output_filepath=output_path)
         
-        # Return audio file
         return FileResponse(
             path=output_path,
             media_type="audio/mpeg",
             filename="doctor_response.mp3"
         )
-    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Text-to-speech error: {e}")
-        raise HTTPException(status_code=500, detail=f"TTS failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="TTS generation failed")
 
 @app.post("/medical-consultation")
 async def medical_consultation(
@@ -328,49 +313,68 @@ async def medical_consultation(
     temp_audio_path = None
     temp_image_path = None
     
+    # Validate user_id format if provided
+    if user_id:
+        user_id = user_id.strip()
+        if not is_valid_uuid(user_id):
+            logger.warning("Unrecognized user_id format; omitting user association")
+            user_id = None
+
     try:
         transcription = ""
         analysis = ""
         
         # ✅ Priority 1: Text input
         if text_input:
+            if len(text_input) > MAX_TEXT_INPUT_LENGTH:
+                raise HTTPException(status_code=400, detail=f"Text input exceeds maximum limit of {MAX_TEXT_INPUT_LENGTH} characters")
             transcription = text_input.strip()
-            logger.info(f"✓ Text input received: {transcription[:100]}...")
+            logger.info("Text input received for consultation")
         
         # ✅ Priority 2: Audio transcription
         elif audio:
             try:
+                audio_content = await audio.read()
+                if len(audio_content) > MAX_AUDIO_SIZE_BYTES:
+                    raise HTTPException(status_code=413, detail=f"Audio exceeds size limit of {MAX_AUDIO_SIZE_BYTES // (1024 * 1024)}MB")
+                if len(audio_content) == 0:
+                    raise HTTPException(status_code=400, detail="Uploaded audio file is empty")
+
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", mode='wb') as temp_audio:
-                    audio_content = await audio.read()
                     temp_audio.write(audio_content)
                     temp_audio.flush()
                     temp_audio_path = temp_audio.name
                 
-                logger.info(f"Transcribing audio from: {temp_audio_path}")
                 transcription = transcribe_with_groq(
                     GROQ_API_KEY=os.environ.get("GROQ_API_KEY"),
                     audio_filepath=temp_audio_path,
                     stt_model="whisper-large-v3"
                 )
-                logger.info(f"✓ Transcription successful: {transcription[:100]}...")
+                logger.info("Audio transcription completed successfully")
+            except HTTPException:
+                raise
             except Exception as audio_error:
-                logger.error(f"✗ Audio transcription failed: {audio_error}")
-                raise HTTPException(status_code=400, detail=f"Audio transcription failed: {str(audio_error)}")
+                logger.error(f"Audio transcription failed: {audio_error}")
+                raise HTTPException(status_code=400, detail="Audio transcription failed")
             finally:
                 if temp_audio_path and os.path.exists(temp_audio_path):
                     try:
                         os.unlink(temp_audio_path)
-                    except:
+                    except Exception:
                         pass
         
         # Handle image analysis if provided
         if image:
             try:
-                # Validate file type
-                if not image.content_type or not image.content_type.startswith('image/'):
-                    raise HTTPException(status_code=400, detail="Please upload a valid image file (JPEG, PNG, etc.)")
+                if not image.content_type or image.content_type.lower() not in ALLOWED_IMAGE_TYPES:
+                    raise HTTPException(status_code=400, detail="Invalid image type. Please upload a JPEG, PNG, or WebP image.")
                 
-                # Determine file extension
+                image_content = await image.read()
+                if len(image_content) > MAX_IMAGE_SIZE_BYTES:
+                    raise HTTPException(status_code=413, detail=f"Image exceeds size limit of {MAX_IMAGE_SIZE_BYTES // (1024 * 1024)}MB")
+                if len(image_content) == 0:
+                    raise HTTPException(status_code=400, detail="Uploaded image is empty")
+
                 file_ext = ".jpg"
                 if "png" in image.content_type.lower():
                     file_ext = ".png"
@@ -378,19 +382,11 @@ async def medical_consultation(
                     file_ext = ".webp"
                 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, mode='wb') as temp_image:
-                    image_content = await image.read()
                     temp_image.write(image_content)
                     temp_image.flush()
                     temp_image_path = temp_image.name
                 
-                # Verify file was created and has content
-                if not os.path.exists(temp_image_path):
-                    raise HTTPException(status_code=500, detail="Failed to save image file")
-                
-                file_size = os.path.getsize(temp_image_path)
-                if file_size == 0:
-                    raise HTTPException(status_code=400, detail="Uploaded image is empty")
-                
+                file_size = len(image_content)
                 logger.info(f"Analyzing image from: {temp_image_path} (size: {file_size} bytes, type: {image.content_type})")
                 
                 # Enhanced prompt - more specific about rejection criteria
@@ -577,21 +573,25 @@ If the image shows ANY medical condition or symptom, provide your analysis norma
         raise HTTPException(status_code=500, detail=f"Consultation failed: {str(e)}")
 
 @app.get("/medical-consultation")
-async def medical_consultation_get(limit: int = Query(10, description="Number of records to fetch")):
-    """Fetch medical consultation records (stub implementation)"""
-    # This is a placeholder for actual database retrieval logic
+async def medical_consultation_get(
+    user_id: str = Query(..., description="User ID"),
+    limit: int = Query(10, ge=1, le=50, description="Number of records to fetch")
+):
+    """Fetch medical consultation records scoped strictly to the requesting user"""
+    if not is_valid_uuid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+    
     try:
-        if not supabase:
+        if not supabase or not supabase_initialized:
             raise HTTPException(status_code=503, detail="Database not configured")
         
-        response = supabase.table("consultations").select("*").limit(limit).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=404, detail="No consultations found")
-        
-        return {"consultations": response.data}
+        response = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit).execute()
+        return {"consultations": response.data or []}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching consultations: {str(e)}")
+        logger.error(f"Error fetching consultations: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching consultations")
 
 # -------------------------
 # Health Insights API Endpoints
@@ -677,6 +677,9 @@ def extract_meaningful_insights(consultations: List[Dict]) -> List[Dict]:
 @app.get("/api/health-insights/{user_id}")
 async def get_health_insights_from_consultations(user_id: str):
     """Get personalized health insights and precautions from consultation history"""
+    if not is_valid_uuid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+
     try:
         if supabase and supabase_initialized:
             try:
@@ -719,6 +722,8 @@ async def get_health_insights_from_consultations(user_id: str):
             "consultation_count": 0,
             "source": "baseline_guidelines"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Health insights error: {e}")
         return {"insights": [], "consultation_count": 0, "error": str(e)}
@@ -727,9 +732,9 @@ async def get_health_insights_from_consultations(user_id: str):
 async def generate_health_insights_from_consultations(request: dict):
     """Generate or refresh health insights from consultation data"""
     try:
-        user_id = request.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=400, detail="User ID required")
+        user_id = (request.get("user_id") or "").strip()
+        if not user_id or not is_valid_uuid(user_id):
+            raise HTTPException(status_code=400, detail="Valid user_id required")
             
         if supabase and supabase_initialized:
             res = supabase.table("consultations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
@@ -743,19 +748,27 @@ async def generate_health_insights_from_consultations(request: dict):
                 }
                 
         return await get_health_insights_from_consultations(user_id)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Health insights generation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Health insights generation failed")
 
 @app.post("/api/health-insights/chat")
 async def health_insights_chat(request: dict):
     """AI Clinical Assistant that answers questions dynamically based on past consultations"""
     try:
-        user_id = request.get("user_id")
+        user_id = (request.get("user_id") or "").strip()
         message = (request.get("message") or "").strip()
         
-        if not user_id or not message:
-            raise HTTPException(status_code=400, detail="user_id and message are required")
+        if not user_id or not is_valid_uuid(user_id):
+            raise HTTPException(status_code=400, detail="Valid user_id required")
+            
+        if not message:
+            raise HTTPException(status_code=400, detail="Message is required")
+            
+        if len(message) > MAX_CHAT_MESSAGE_LENGTH:
+            message = message[:MAX_CHAT_MESSAGE_LENGTH]
             
         consultations = []
         if supabase and supabase_initialized:
@@ -797,48 +810,43 @@ Clinical Answering Rules:
 
         reply = clean_medical_text(analyze_text_only(prompt))
         return {"reply": reply}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Health insights chat error: {e}")
-        return {"reply": f"Sorry, I encountered an issue accessing your records: {str(e)}"}
+        return {"reply": "Sorry, I encountered an issue accessing your records. Please try again."}
 
 @app.delete("/api/health-insights/{insight_id}")
 async def delete_health_insight(insight_id: str, user_id: str = Query(...)):
     """Delete a specific health insight - simplified version"""
-    try:
-        # Since we're now generating insights on-demand from consultations,
-        # we'll return a success message without actual deletion
-        return {
-            "message": "Insight removed from current session. Generate new insights to refresh.",
-            "database_configured": bool(supabase)
-        }
-        
-    except Exception as e:
-        print(f"Error handling insight deletion: {str(e)}")
-        return {
-            "message": f"Error processing request: {str(e)}",
-            "database_configured": bool(supabase)
-        }
+    if not is_valid_uuid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
 
+    return {
+        "message": "Insight removed from current session. Generate new insights to refresh.",
+        "database_configured": bool(supabase)
+    }
 
 @app.api_route("/download-audio/{filename}", methods=["GET", "HEAD"])
 async def download_audio(filename: str):
-    """Download generated audio file safely"""
+    """Download generated audio file safely with strict path-traversal prevention"""
+    # Strict regex: only alphanumeric, hyphen, underscore + .mp3 extension
+    if not re.match(r'^[a-zA-Z0-9_\-]+\.mp3$', filename):
+        raise HTTPException(status_code=400, detail="Invalid audio filename format")
+    
     safe_name = os.path.basename(filename)
-    path_in_dir = os.path.join(AUDIO_DIR, safe_name)
-    if os.path.exists(path_in_dir):
-        return FileResponse(
-            path=path_in_dir,
-            media_type="audio/mpeg",
-            filename="doctor_response.mp3"
-        )
-    elif os.path.exists(safe_name):
-        return FileResponse(
-            path=safe_name,
-            media_type="audio/mpeg",
-            filename="doctor_response.mp3"
-        )
-    else:
+    real_audio_dir = os.path.realpath(AUDIO_DIR)
+    path_in_dir = os.path.realpath(os.path.join(real_audio_dir, safe_name))
+    
+    # Path traversal validation: canonical path must start with real_audio_dir
+    if not path_in_dir.startswith(real_audio_dir) or not os.path.isfile(path_in_dir):
         raise HTTPException(status_code=404, detail="Audio file not found")
+        
+    return FileResponse(
+        path=path_in_dir,
+        media_type="audio/mpeg",
+        filename="doctor_response.mp3"
+    )
 
 if __name__ == "__main__":
     import uvicorn

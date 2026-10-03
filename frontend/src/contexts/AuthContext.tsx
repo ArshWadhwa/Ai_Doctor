@@ -84,20 +84,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, fullName: string) => {
     setLoading(true)
     try {
-      console.log('Attempting to sign up with email:', email)
       const result = await authService.signUp(email, password, fullName)
-      console.log('Sign up result:', result)
-      
-      if (result.error) {
-        console.error('Sign up error:', result.error)
-      } else {
-        console.log('Sign up successful, user:', result.data?.user)
-      }
-      
       setLoading(false)
       return result
     } catch (error) {
-      console.error('Sign up exception:', error)
       setLoading(false)
       return { data: null, error: { message: 'An unexpected error occurred' } }
     }
@@ -106,20 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
-      console.log('Attempting to sign in with email:', email)
       const result = await authService.signIn(email, password)
-      console.log('Sign in result:', result)
-      
-      if (result.error) {
-        console.error('Sign in error:', result.error)
-      } else {
-        console.log('Sign in successful, user:', result.data?.user)
-      }
-      
       setLoading(false)
       return result
     } catch (error) {
-      console.error('Sign in exception:', error)
       setLoading(false)
       return { data: null, error: { message: 'An unexpected error occurred' } }
     }
@@ -128,15 +108,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     setLoading(true)
     try {
-      console.log('Attempting to sign in with Google OAuth')
       const result = await authService.signInWithGoogle()
       if (result.error) {
-        console.error('Google sign in error:', result.error)
         setLoading(false)
       }
       return result
     } catch (error) {
-      console.error('Google sign in exception:', error)
       setLoading(false)
       return { data: null, error: { message: 'Failed to initialize Google Sign In' } }
     }

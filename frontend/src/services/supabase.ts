@@ -6,7 +6,6 @@ export const authService = {
   // Sign up new user with dynamic origin redirect
   async signUp(email: string, password: string, fullName: string) {
     const redirectUrl = `${window.location.origin}/dashboard`;
-    console.log('Supabase signUp called with redirect:', redirectUrl);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -17,25 +16,21 @@ export const authService = {
         }
       }
     });
-    console.log('Supabase signUp response:', { data: data ? 'user data received' : 'no data', error });
     return { data, error };
   },
 
   // Sign in existing user
   async signIn(email: string, password: string) {
-    console.log('Supabase signIn called with:', { email, passwordLength: password.length });
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    console.log('Supabase signIn response:', { data: data ? 'user data received' : 'no data', error });
     return { data, error };
   },
 
   // Sign in with Google OAuth
   async signInWithGoogle() {
     const redirectUrl = `${window.location.origin}/dashboard`;
-    console.log('Supabase signInWithGoogle called with redirect:', redirectUrl);
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
